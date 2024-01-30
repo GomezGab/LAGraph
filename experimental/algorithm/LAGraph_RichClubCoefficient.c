@@ -41,7 +41,7 @@
     GrB_free (&edge_degrees) ;              \
     GrB_free (&reorder_g) ;                 \
     GrB_free (&D) ;                         \
-    GrB_free (&deg) ;                       \
+    GrB_free (&degrees) ;                       \
     GrB_free (&edge_gp_deg) ;               \
     GrB_free (&edge_eq_deg) ;               \
     GrB_free (&cumulative_deg) ;            \
@@ -66,7 +66,7 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     GrB_Vector *rich_club_coefficents,    //rich_club_coefficents(i): rich club coefficents of i
 
     // input: not modified
-    LAGraph_Graph G,
+    LAGraph_Graph G, //input graph
     char *msg
 )
 {
@@ -74,19 +74,39 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     //--------------------------------------------------------------------------
     // check inputs
     //--------------------------------------------------------------------------
-
+    LG_CLEAR_MSG ;
+    //Matrix containing every edge 
+    //With an entry cooresponding to the degree of its column
     GrB_Matrix edge_degrees = NULL;
+
+    //
     GrB_Matrix reorder_g = NULL;
+
+    //A matrix with diagonal entries corresponding to degrees.
     GrB_Matrix D = NULL;
 
-    GrB_Vector deg = NULL;
+    //degrees of nodes.
+    GrB_Vector degrees = NULL;
+
+    //contains the number of edges for which the ith node is
+    //the smallest degree node in the pair
     GrB_Vector edge_gp_deg = NULL;
+
+    //contains the number of edges for which the ith node is
+    //the same degree as the other node in the pair
+    //used to correct for undercounted nodes
     GrB_Vector edge_eq_deg = NULL;
+
+    //the ith entry contains the number of nodes with degree greter than i.
     GrB_Vector cumulative_deg = NULL;
+
+    //the ith entry contains the number of edges among nodes with degree greter than i.
     GrB_Vector edges_per_deg = NULL;
 
+    //LG_ASSERT (rich_club_coefficents != NULL, GrB_NULL_POINTER);
 
-    LG_CLEAR_MSG ;                      // clears the msg string, if not NULL
+
+    
 
     LG_FREE_WORK ;
     return (GrB_SUCCESS) ;
