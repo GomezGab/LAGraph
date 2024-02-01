@@ -41,7 +41,7 @@
     GrB_free (&edge_degrees) ;              \
     GrB_free (&reorder_g) ;                 \
     GrB_free (&D) ;                         \
-    GrB_free (&degrees) ;                       \
+    GrB_free (&degrees) ;                   \
     GrB_free (&edge_gp_deg) ;               \
     GrB_free (&edge_eq_deg) ;               \
     GrB_free (&cumulative_deg) ;            \
@@ -53,7 +53,7 @@
     /* free any workspace used here */      \
     LG_FREE_WORK ;                          \
     /* free all the output variable(s) */   \
-    GrB_free (&rich_club_coefficents) ;     \
+    GrB_free (rich_club_coefficents) ;      \
     /* take any other corrective action */  \
 }
 
@@ -79,7 +79,8 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     //With an entry cooresponding to the degree of its column
     GrB_Matrix edge_degrees = NULL;
 
-    //
+    // Basically a histogram of matrix degrees
+    // Used to calculate cumulative sums
     GrB_Matrix reorder_g = NULL;
 
     //A matrix with diagonal entries corresponding to degrees.
@@ -103,11 +104,47 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     //the ith entry contains the number of edges among nodes with degree greter than i.
     GrB_Vector edges_per_deg = NULL;
 
-    //LG_ASSERT (rich_club_coefficents != NULL, GrB_NULL_POINTER);
+    GrB_Matrix A ;
+    GrB_Index n ;
 
+    LG_TRY (LAGraph_CheckGraph (G, msg)) ;
+    LG_ASSERT (rich_club_coefficents != NULL, GrB_NULL_POINTER);
 
-    
+    //double check this
+    LG_ASSERT_MSG(G->kind == LAGraph_ADJACENCY_UNDIRECTED, GrB_INVALID_VALUE, "G->A must be symmetric") ;
+    LG_ASSERT_MSG (G->out_degree != NULL, GrB_EMPTY_OBJECT,"G->out_degree must be defined") ;
+    LG_ASSERT_MSG (G->nself_edges == 0, GrB_INVALID_VALUE, "G->nself_edges must be zero") ;
+    A = G->A ;
+    GRB_TRY(GrB_Matrix_nrows (&n, A)) ;
+    GRB_TRY(GrB_Matrix_new(&edge_degrees, GrB_UINT64,n,n)) ;
+    GRB_TRY(GrB_Vector_new(&degrees, GrB_UINT64, n)) ;
+    GRB_TRY(GrB_Vector_new(&edge_gp_deg, GrB_UINT64, n)) ;
+    GRB_TRY(GrB_Vector_new(&edge_eq_deg, GrB_UINT64, n)) ;
+    GRB_TRY(GrB_Vector_new(&cumulative_deg, GrB_UINT64, n)) ;
+    GRB_TRY(GrB_Vector_new(&edges_per_deg, GrB_UINT64, n)) ;
 
+    // code from LAGraph_MaximalIndependentSet
+    // degrees = G->out_degree (check if this is needed) (I think no)
+    GRB_TRY (GrB_assign (degrees, NULL, NULL, G->out_degree, GrB_ALL, n, NULL)) ;
+
+    // code from LAGraph_SquareClustering
+    // out_degrees as a diagonal matrix.
+    #if LAGRAPH_SUITESPARSE
+        #if GxB_IMPLEMENTATION >= GxB_VERSION (7,0,0)
+        // SuiteSparse 7.x and later:
+        GRB_TRY (GrB_Matrix_diag(&D, degrees, 0)) ;
+        #else
+        // SuiteSparse 6.x and earlier, which had the incorrect signature:
+        GRB_TRY (GrB_Matrix_new(&D, GrB_INT64, n, n)) ;
+        GRB_TRY (GrB_Matrix_diag(D, degrees, 0)) ;
+        #endif
+    #else
+    // standard GrB:
+    GRB_TRY (GrB_Matrix_diag(&D, degrees, 0)) ;
+    #endif
+
+    //figure out descriptor
+    //GrB_mxm(edge_degrees, NULL, NULL, semi, A, D, GrB_NULL)
     LG_FREE_WORK ;
     return (GrB_SUCCESS) ;
 }
