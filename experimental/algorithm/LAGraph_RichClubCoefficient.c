@@ -39,10 +39,9 @@
 {                                           \
     /* free any workspace used here */      \
     GrB_free (&edge_degrees) ;              \
-    GrB_free (&reorder_g) ;                 \
     GrB_free (&D) ;                         \
     GrB_free (&degrees) ;                   \
-    GrB_free (&edge_gp_deg) ;               \
+    GrB_free (&edge_gt_deg) ;               \
     GrB_free (&edge_eq_deg) ;               \
     GrB_free (&cumulative_deg) ;            \
     GrB_free (&edges_per_deg) ;             \
@@ -79,10 +78,6 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     //With an entry cooresponding to the degree of its column
     GrB_Matrix edge_degrees = NULL;
 
-    // Basically a histogram of matrix degrees
-    // Used to calculate cumulative sums
-    GrB_Matrix reorder_g = NULL;
-
     //A matrix with diagonal entries corresponding to degrees.
     GrB_Matrix D = NULL;
 
@@ -91,7 +86,7 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
 
     //contains the number of edges for which the ith node is
     //the smallest degree node in the pair
-    GrB_Vector edge_gp_deg = NULL;
+    GrB_Vector edge_gt_deg = NULL;
 
     //contains the number of edges for which the ith node is
     //the same degree as the other node in the pair
@@ -118,7 +113,7 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     GRB_TRY(GrB_Matrix_nrows (&n, A)) ;
     GRB_TRY(GrB_Matrix_new(&edge_degrees, GrB_UINT64,n,n)) ;
     GRB_TRY(GrB_Vector_new(&degrees, GrB_UINT64, n)) ;
-    GRB_TRY(GrB_Vector_new(&edge_gp_deg, GrB_UINT64, n)) ;
+    GRB_TRY(GrB_Vector_new(&edge_gt_deg, GrB_UINT64, n)) ;
     GRB_TRY(GrB_Vector_new(&edge_eq_deg, GrB_UINT64, n)) ;
     GRB_TRY(GrB_Vector_new(&cumulative_deg, GrB_UINT64, n)) ;
     GRB_TRY(GrB_Vector_new(&edges_per_deg, GrB_UINT64, n)) ;
@@ -142,9 +137,17 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     // standard GrB:
     GRB_TRY (GrB_Matrix_diag(&D, degrees, 0)) ;
     #endif
+    //Assigns each edge in the graph the value of their column node
+    //IDK what the desctriptor is
+    GRB_TRY (GrB_mxm(edge_degrees, NULL, NULL, GxB_ANY_SECOND_UINT64,A,D,GrB_DESC_T1)) ;
+    
+    //Adds up all the edges whose rows degrees are greater than their column degrees
+    GRB_TRY(GrB_vxm(edge_gt_deg, NULL, NULL, GxB_PLUS_ISGT_UINT64, D, edge_degrees, GrB_DESC_T1)) ;
 
-    //figure out descriptor
-    //GrB_mxm(edge_degrees, NULL, NULL, semi, A, D, GrB_NULL)
+    //Adds up all the edges whose rows degrees are greater than their column degrees
+    GRB_TRY(GrB_vxm(edge_eq_deg, NULL, NULL, GxB_PLUS_ISEQ_UINT64, D, edge_degrees, GrB_DESC_T1)) ;
+
+
     LG_FREE_WORK ;
     return (GrB_SUCCESS) ;
 }

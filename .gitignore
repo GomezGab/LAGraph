@@ -38,6 +38,7 @@ gmon.out
 *.tmp
 *.idea
 *.dylib
+/.vscode
 cmake-build-debug*
 CMakeFiles*
 *~
