@@ -1,5 +1,5 @@
 //------------------------------------------------------------------------------
-// LAGraph_RichClubCoefficient: a nearly empty algorithm
+// LAGraph_RichClubCoefficient: rich club coefficients and edge randomization
 //------------------------------------------------------------------------------
 
 // LAGraph, (c) 2019-2022 by The LAGraph Contributors, All Rights Reserved.
@@ -15,25 +15,25 @@
 
 //------------------------------------------------------------------------------
 
-// This is a bare-bones "algorithm" that does nearly nothing all.  It simply
-// illustrates how a new algorithm can be added to the experimental/algorithm
-// folder.  All it does is make a copy of the G->A matrix and return it as
-// the new matrix Y.  Inside, it allocates some worspace as well (the matrix W,
-// which is not used).  To illustrate the use of the error msg string, it
-// returns an error if the graph not directed.
+// Get the rich club coefficient of a graph, also allows for edge randomization
+// to normalize the coefficients in a graph.
 
-// The GRB_TRY and LG_TRY macros use the LG_FREE_ALL macro to free all
-// workspace and all output variables if an error occurs.  To use these macros,
-// you must define the variables before using them, or before using GRB_TRY
-// or LG_TRY.  The LG_TRY macro is defined in src/utility/LG_internal.h.
+// Given a Symetric Graph with no self edges, LAGraph_RichClubCoefficient will
+// first randomized edges without changing the degree pattern and will then 
+// calculate the rich club coefficients of the resulting graph.
 
-// To create your own algorithm, create a copy of this file, rename it
-// to LAGraph_whatever.c, and use it as a template for your own algorithm.
-// Then place the prototype in include/LAGraphX.h.
+// The values will be output as a sparce GrB_Vector, the rich club coefficient 
+// of any value not in the vector is equivilant to the closest value above it.
 
-// See experimental/test/test_HelloWorld.c for a test for this method, and
-// experimental/benchmark/helloworld_demo.c and helloworld2_demo.c for two
-// methods that benchmark the performance of this algorithm.
+// References:
+
+// Julian J. McAuley, Luciano da Fontoura Costa, and Tibério S. Caetano, “The 
+// rich-club phenomenon across complex network hierarchies”, Applied Physics 
+// Letters Vol 91 Issue 8, August 2007. https://arxiv.org/abs/physics/0701290
+
+// R. Milo, N. Kashtan, S. Itzkovitz, M. E. J. Newman, U. Alon, “Uniform 
+// generation of random graphs with arbitrary degree sequences”, 2006. 
+// https://arxiv.org/abs/cond-mat/0312028
 
 #define LG_FREE_WORK                        \
 {                                           \
@@ -69,6 +69,8 @@ void two_one_add_uint64(uint64_t *z, const uint64_t *x, const uint64_t *y)
 { 
     (*z) = 2*(*x) + (*y);
 }
+
+
 int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
 (
     // output
@@ -81,7 +83,7 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
 {
 
     //--------------------------------------------------------------------------
-    // check inputs
+    // Declorations
     //--------------------------------------------------------------------------
     LG_CLEAR_MSG ;
     //Matrix containing every edge 
@@ -116,6 +118,12 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     GrB_Matrix A ;
     GrB_Index n ;
 
+    // Grb_Index **edge_count_per_node = NULL;
+
+
+    //--------------------------------------------------------------------------
+    // Check inputs
+    //--------------------------------------------------------------------------
     LG_TRY (LAGraph_CheckGraph (G, msg)) ;
     LG_ASSERT (rich_club_coefficents != NULL, GrB_NULL_POINTER);
 
@@ -123,6 +131,10 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     LG_ASSERT_MSG(G->kind == LAGraph_ADJACENCY_UNDIRECTED, GrB_INVALID_VALUE, "G->A must be symmetric") ;
     LG_ASSERT_MSG (G->out_degree != NULL, GrB_EMPTY_OBJECT,"G->out_degree must be defined") ;
     LG_ASSERT_MSG (G->nself_edges == 0, GrB_INVALID_VALUE, "G->nself_edges must be zero") ;
+
+    //--------------------------------------------------------------------------
+    // Initializations
+    //--------------------------------------------------------------------------
     A = G->A ;
     GRB_TRY(GrB_Matrix_nrows (&n, A)) ;
     GRB_TRY(GrB_Matrix_new(&edge_degrees, GrB_UINT64,n,n)) ;
