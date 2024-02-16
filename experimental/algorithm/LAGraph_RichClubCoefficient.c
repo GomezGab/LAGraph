@@ -70,6 +70,10 @@ void two_one_add_uint64(uint64_t *z, const uint64_t *x, const uint64_t *y)
     (*z) = 2*(*x) + (*y);
 }
 
+void rich_club_formula(double *z, const uint64_t *x, const uint64_t *y)
+{
+    (*z) = (*x) / ((double)(*y) * ((*y) - 1));
+}
 
 int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
 (
@@ -115,10 +119,20 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     GrB_Vector edges_per_deg = NULL;
 
     GrB_BinaryOp two_one = NULL;
+
+    //check if I need to free these
     GrB_Matrix A ;
     GrB_Index n ;
 
-    // Grb_Index **edge_count_per_node = NULL;
+    //NOTE YOU STILL HAVE TO GRBFREE THIS WITH A LOOP
+    GrB_Index **index_edge = NULL; // does this need to be null to start with? 
+    //Should the arrays be initialized before fed to the function?
+    void **edge_count_per_node = NULL;
+
+    //NOTE YOU STILL HAVE TO GRBFREE THIS WITH A LOOP
+    GrB_Index **index_degree = NULL; // does this need to be null to start with?
+    void **degree_array = NULL;
+
 
 
     //--------------------------------------------------------------------------
@@ -179,7 +193,7 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     //Do I care if this is set intersection or union?
     GRB_TRY(GrB_eWiseMult(edge_adjusted_deg, NULL, NULL, two_one, edge_eq_deg, edge_gt_deg, GrB_DESC_T1));
 
-    //GRB_TRY(GxB_Vector_unpack()) ;
+    //GRB_TRY(GxB_Vector_unpack_CSC(edge_adjusted_deg, index_edge, edge_count_per_node,)) ;
     LG_FREE_WORK ;
     return (GrB_SUCCESS) ;
 }
