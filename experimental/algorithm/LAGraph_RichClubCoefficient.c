@@ -45,6 +45,7 @@
     GrB_free (&edge_eq_deg) ;               \
     GrB_free (&cumulative_deg) ;            \
     GrB_free (&edges_per_deg) ;             \
+    GrB_free (&two_one) ;                   \
 }
 
 #define LG_FREE_ALL                         \
@@ -59,6 +60,15 @@
 #include "LG_internal.h"
 #include "LAGraphX.h"
 
+//taken from LAGraph_BF_full_mxv
+//Is this best way to do this?
+typedef void (*LAGraph_binary_function) (void *, const void *, const void *) ;
+
+//I am hoping this gets done in a single leaq.
+void two_one_add_uint64(uint64_t *z, const uint64_t *x, const uint64_t *y)
+{ 
+    (*z) = 2*(*x) + (*y);
+}
 int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
 (
     // output
@@ -93,12 +103,16 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     //used to correct for undercounted nodes
     GrB_Vector edge_eq_deg = NULL;
 
+    //Combines edge_gt_deg and edge_eq_deg to account for double counting in edge_eq_deg
+    GrB_Vector edge_adjusted_deg = NULL;
+
     //the ith entry contains the number of nodes with degree greter than i.
     GrB_Vector cumulative_deg = NULL;
 
     //the ith entry contains the number of edges among nodes with degree greter than i.
     GrB_Vector edges_per_deg = NULL;
 
+    GrB_BinaryOp two_one = NULL;
     GrB_Matrix A ;
     GrB_Index n ;
 
@@ -117,7 +131,10 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     GRB_TRY(GrB_Vector_new(&edge_eq_deg, GrB_UINT64, n)) ;
     GRB_TRY(GrB_Vector_new(&cumulative_deg, GrB_UINT64, n)) ;
     GRB_TRY(GrB_Vector_new(&edges_per_deg, GrB_UINT64, n)) ;
-
+    
+    GRB_TRY(GxB_BinaryOp_new(&two_one, (LAGraph_binary_function) (&two_one_add_uint64), GrB_UINT64, GrB_UINT64, GrB_UINT64, "two_one_add_uint64",
+                "void two_one_add_uint64(uint64_t *z, const uint64_t *x, const uint64_t *y) { (*z) = 2*(*x) + (*y); } ")) ;
+            
     // code from LAGraph_MaximalIndependentSet
     // degrees = G->out_degree (check if this is needed) (I think no)
     GRB_TRY (GrB_assign (degrees, NULL, NULL, G->out_degree, GrB_ALL, n, NULL)) ;
@@ -142,12 +159,15 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     GRB_TRY (GrB_mxm(edge_degrees, NULL, NULL, GxB_ANY_SECOND_UINT64,A,D,GrB_DESC_T1)) ;
     
     //Adds up all the edges whose rows degrees are greater than their column degrees
-    GRB_TRY(GrB_vxm(edge_gt_deg, NULL, NULL, GxB_PLUS_ISGT_UINT64, D, edge_degrees, GrB_DESC_T1)) ;
+    GRB_TRY(GrB_vxm(edge_gt_deg, NULL, NULL, GxB_PLUS_ISGT_UINT64, degrees, edge_degrees, GrB_DESC_T1)) ;
 
     //Adds up all the edges whose rows degrees are greater than their column degrees
-    GRB_TRY(GrB_vxm(edge_eq_deg, NULL, NULL, GxB_PLUS_ISEQ_UINT64, D, edge_degrees, GrB_DESC_T1)) ;
+    GRB_TRY(GrB_vxm(edge_eq_deg, NULL, NULL, GxB_PLUS_ISEQ_UINT64, degrees, edge_degrees, GrB_DESC_T1)) ;
 
+    //Do I care if this is set intersection or union?
+    GRB_TRY(GrB_eWiseMult(edge_adjusted_deg, NULL, NULL, two_one, edge_eq_deg, edge_gt_deg, GrB_DESC_T1));
 
+    //GRB_TRY(GxB_Vector_unpack()) ;
     LG_FREE_WORK ;
     return (GrB_SUCCESS) ;
 }
