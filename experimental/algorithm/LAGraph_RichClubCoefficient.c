@@ -23,7 +23,7 @@
 // calculate the rich club coefficients of the resulting graph.
 
 // The values will be output as a sparce GrB_Vector, the rich club coefficient 
-// of any value not in the vector is equivilant to the closest value above it.
+// of any value not in the vector is equivilant to the closest value before it.
 
 // References:
 
@@ -78,7 +78,8 @@ void rich_club_formula(double *z, const uint64_t *x, const uint64_t *y)
 int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
 (
     // output
-    GrB_Vector *rich_club_coefficents,    //rich_club_coefficents(i): rich club coefficents of i
+    //rich_club_coefficents(i): rich club coefficents of i
+    GrB_Vector *rich_club_coefficents,    
 
     // input: not modified
     LAGraph_Graph G, //input graph
@@ -120,16 +121,26 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
 
     GrB_BinaryOp two_one = NULL;
 
-    //check if I need to free these
+    //TODO: check if I need to free these
     GrB_Matrix A ;
     GrB_Index n ;
+    GrB_Index vi_size ;
+    GrB_Index vx_size ;
+    GrB_Index edge_vec_size;
+    GrB_Index deg_vec_size;
+    bool iso = false;
 
-    //NOTE YOU STILL HAVE TO GRBFREE THIS WITH A LOOP
-    GrB_Index **index_edge = NULL; // does this need to be null to start with? 
+    //TODO: YOU STILL HAVE TO GRBFREE THIS WITH A LOOP?
     //Should the arrays be initialized before fed to the function?
+    GrB_Index **index_edge = NULL; // does this need to be null to start with? 
+    
+    //TODO: check if this is void or GrB_UINT64
     void **edge_count_per_node = NULL;
+    void **deg_arr = NULL;
 
-    //NOTE YOU STILL HAVE TO GRBFREE THIS WITH A LOOP
+
+
+    //TODO: YOU STILL HAVE TO GRBFREE THIS WITH A LOOP? 
     GrB_Index **index_degree = NULL; // does this need to be null to start with?
     void **degree_array = NULL;
 
@@ -141,7 +152,7 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     LG_TRY (LAGraph_CheckGraph (G, msg)) ;
     LG_ASSERT (rich_club_coefficents != NULL, GrB_NULL_POINTER);
 
-    //double check this
+    //TODO: double check this
     LG_ASSERT_MSG(G->kind == LAGraph_ADJACENCY_UNDIRECTED, GrB_INVALID_VALUE, "G->A must be symmetric") ;
     LG_ASSERT_MSG (G->out_degree != NULL, GrB_EMPTY_OBJECT,"G->out_degree must be defined") ;
     LG_ASSERT_MSG (G->nself_edges == 0, GrB_INVALID_VALUE, "G->nself_edges must be zero") ;
@@ -158,8 +169,13 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     GRB_TRY(GrB_Vector_new(&cumulative_deg, GrB_UINT64, n)) ;
     GRB_TRY(GrB_Vector_new(&edges_per_deg, GrB_UINT64, n)) ;
     
-    GRB_TRY(GxB_BinaryOp_new(&two_one, (LAGraph_binary_function) (&two_one_add_uint64), GrB_UINT64, GrB_UINT64, GrB_UINT64, "two_one_add_uint64",
-                "void two_one_add_uint64(uint64_t *z, const uint64_t *x, const uint64_t *y) { (*z) = 2*(*x) + (*y); } ")) ;
+    GRB_TRY(GxB_BinaryOp_new(
+        &two_one, (LAGraph_binary_function) (&two_one_add_uint64), 
+        GrB_UINT64, GrB_UINT64, GrB_UINT64, "two_one_add_uint64",
+        "void two_one_add_uint64\
+        (uint64_t *z, const uint64_t *x, const uint64_t *y)\
+        { (*z) = 2*(*x) + (*y); } "
+        )) ;
             
     // code from LAGraph_MaximalIndependentSet
     // degrees = G->out_degree (check if this is needed) (I think no)
@@ -188,12 +204,25 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     GRB_TRY(GrB_vxm(edge_gt_deg, NULL, NULL, GxB_PLUS_ISGT_UINT64, degrees, edge_degrees, GrB_DESC_T1)) ;
 
     //Adds up all the edges whose rows degrees are greater than their column degrees
+    //Double check that this can return zeros and not just novals
     GRB_TRY(GrB_vxm(edge_eq_deg, NULL, NULL, GxB_PLUS_ISEQ_UINT64, degrees, edge_degrees, GrB_DESC_T1)) ;
 
     //Do I care if this is set intersection or union?
-    GRB_TRY(GrB_eWiseMult(edge_adjusted_deg, NULL, NULL, two_one, edge_eq_deg, edge_gt_deg, GrB_DESC_T1));
+    GRB_TRY(GrB_eWiseAdd(edge_adjusted_deg, NULL, NULL, two_one, edge_eq_deg, edge_gt_deg, GrB_DESC_T1));
 
-    //GRB_TRY(GxB_Vector_unpack_CSC(edge_adjusted_deg, index_edge, edge_count_per_node,)) ;
+    GRB_TRY(GrB_Vector_nvals (&edge_vec_size, edge_adjusted_deg));
+    vi_size = (edge_vec_size+1)*sizeof(GrB_Index);
+    vx_size = (edge_vec_size+1)*sizeof(GrB_UINT64);
+    //nearly certain sparcity patern should be the same at this point 
+    // as long as GxB_PLUS_ISEQ_UINT64 can give me 0s for some things.
+
+    GRB_TRY(GxB_Vector_unpack_CSC(
+        edge_adjusted_deg, index_edge, edge_count_per_node,
+        &vi_size,&vx_size,&iso,&edge_vec_size,NULL, GrB_DESC_T1));
+    GRB_TRY(GxB_Vector_unpack_CSC(
+        degrees, index_edge, deg_arr,
+        &vi_size,&vx_size,&iso,&edge_vec_size,NULL, GrB_DESC_T1));
+
     LG_FREE_WORK ;
     return (GrB_SUCCESS) ;
 }
