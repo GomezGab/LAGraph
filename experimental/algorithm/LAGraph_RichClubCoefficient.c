@@ -22,8 +22,8 @@
 // first randomized edges without changing the degree pattern and will then 
 // calculate the rich club coefficients of the resulting graph.
 
-// The values will be output as a sparce GrB_Vector, the rich club coefficient 
-// of any value not in the vector is equivilant to the closest value before it.
+// The values will be output as a dense GrB_Vector, the rich club coefficient 
+// of the kth degree found at entry k.
 
 // References:
 
@@ -72,10 +72,12 @@ void two_one_add_uint64(uint64_t *z, const uint64_t *x, const uint64_t *y)
 
 void rich_club_formula(double *z, const uint64_t *x, const uint64_t *y)
 {
+    // I would acually rather do this with the index of the element and make 
+    // this a monoid. is that possible?
     (*z) = (*x) / ((double)(*y) * ((*y) - 1));
-}
+} 
 
-int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
+int LAGraph_RichClubCoefficient
 (
     // output
     //rich_club_coefficents(i): rich club coefficents of i
@@ -113,11 +115,14 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     //Combines edge_gt_deg and edge_eq_deg to account for double counting in edge_eq_deg
     GrB_Vector edge_adjusted_deg = NULL;
 
+    // the ith entry contains the number of edges whos lowest degree is i.
+    GrB_Vector edges_per_deg = NULL;
+
     //the ith entry contains the number of nodes with degree greter than i.
     GrB_Vector cumulative_deg = NULL;
 
-    //the ith entry contains the number of edges among nodes with degree greter than i.
-    GrB_Vector edges_per_deg = NULL;
+    //the ith entry contains the number of edges among nodes with degree greater than i.
+    GrB_Vector cumulative_edges = NULL;
 
     GrB_BinaryOp two_one = NULL;
 
@@ -137,6 +142,7 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     //TODO: check if this is void or GrB_UINT64
     void **edge_count_per_node = NULL;
     void **deg_arr = NULL;
+    void **edges_per_deg_arr= NULL;
 
 
 
@@ -222,6 +228,19 @@ int LAGraph_RichClubCoefficient // a simple algorithm, just for illustration
     GRB_TRY(GxB_Vector_unpack_CSC(
         degrees, index_edge, deg_arr,
         &vi_size,&vx_size,&iso,&edge_vec_size,NULL, GrB_DESC_T1));
+
+    //Build with degrees as indecies and handle duplicates via adition
+    GRB_TRY(GrB_Vector_build (edges_per_deg, *deg_arr, *edge_count_per_node, n, GrB_PLUS_INT64)) ;
+    GRB_TRY(GxB_Vector_unpack_CSC(
+        edges_per_deg, index_edge, edges_per_deg_arr,
+        &vi_size,&vx_size,&iso,&edge_vec_size,NULL, GrB_DESC_T1));
+    
+    //run a cummulative sum (backwards) on edges_per_deg_arr
+
+    //Construct a vector thats has edges_per_deg_arr values but repeated whenever 
+    //index_edge has a skip and put into cumulative edges
+    // ie. [0,1,6,7,10] & [9,7,3,2,0] ->
+    // [9,7,7,7,7,7,3,2,2,2,0]
 
     LG_FREE_WORK ;
     return (GrB_SUCCESS) ;
