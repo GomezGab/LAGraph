@@ -11,6 +11,9 @@
 
 //------------------------------------------------------------------------------
 
+// FIXME: almost ready for src; says it's not vanilla but should be OK
+// FIXME: need the CI test for this method
+
 // Takes in a graph and finds the diameter 
 // and optionally also the peripheral nodes of the graph
 

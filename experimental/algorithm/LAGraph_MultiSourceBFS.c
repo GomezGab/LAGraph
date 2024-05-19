@@ -11,6 +11,9 @@
 
 //------------------------------------------------------------------------------
 
+// FIXME: almost ready for src; need a vanilla method
+// FIXME: need the CI test for this method
+
 // Takes in a vector of source nodes and finds level and/or parent vectors for each,
 // stored together in a matrix
 

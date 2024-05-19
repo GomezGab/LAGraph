@@ -11,6 +11,9 @@
 
 //------------------------------------------------------------------------------
 
+// FIXME: almost ready for src; need to handle GxB
+// FIXME: need the CI test for this method
+
 // Takes in a graph and estimates the diameter 
 // and optionally also finds pseudo-peripheral nodes of the graph
 
