@@ -261,7 +261,7 @@ int LAGraph_RichClubCoefficient
     // If they have the same degree, that edge is double counted. So, we adjust:
     // edge_adjusted_deg = 2 * (x > y) + (x == y)
     GRB_TRY(GrB_vxm(
-        edge_gt_deg, NULL, NULL, plus_2le, 
+        edge_adjusted_deg, NULL, NULL, plus_2le, 
         degrees, edge_degrees, GrB_NULL)) ;
 
     GRB_TRY(GrB_Vector_nvals (&edge_vec_nvals, edge_adjusted_deg));

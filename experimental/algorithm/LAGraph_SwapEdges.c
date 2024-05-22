@@ -32,10 +32,10 @@
 #include "LG_internal.h"
 #include "LAGraphX.h"
 
-int LAGraph_HelloWorld // a simple algorithm, just for illustration
+int LAGraph_SwapEdges
 (
     // output
-    GrB_Matrix *A_new,
+    GrB_Matrix *A_new, //The adjacency matrix of G with edges randomly swapped
     // input: not modified
     LAGraph_Graph G,
     GrB_Index Q, // Swaps per edge
@@ -135,7 +135,7 @@ int LAGraph_HelloWorld // a simple algorithm, just for illustration
     GRB_TRY (GrB_Matrix_new(&E_selected, GrB_UINT8, n, e)) ; 
 
     GrB_Index num_swaps = 0, num_attempts = 0 ; 
-    // QUESTION: Should this decrease if edges don't want to swap?
+    // QUESTION: Should this decrease if edges are interfering alot?
     GrB_Index swaps_per_loop = e / 3 ; // 1/3 reasonable?
 
     GRB_TRY (GrB_Matrix_new(&pairs, GrB_UINT8, e, swaps_per_loop)) ; 
@@ -198,24 +198,26 @@ int LAGraph_HelloWorld // a simple algorithm, just for illustration
     GRB_TRY (GrB_Scalar_setElement_UINT64 (zero64, 0)) ;
     // QUESTION: Should this be GxB_Vector_pack??
     GRB_TRY (
-        GxB_Vector_build_Scalar(random_v, ramp, zero64, e)); */
-    // TODO check this
-    uint8_t zero_8 = 0;
+        GxB_Vector_build_Scalar(random_v, ramp, zero64, e)); */   
     
     // QUESTION: diffrence? which is better?
-    /* GRB_TRY(GxB_Vector_pack_Full(
+    /* 
+    uint8_t zero_8 = 0;
+    GRB_TRY(GxB_Vector_pack_Full(
         random_v, &zero_8, sizeof(uint8_t), true, NULL
     )) ; */
     GRB_TRY (GrB_assign (x, NULL, NULL, 0, GrB_ALL, swaps_per_loop, NULL)) ;
     GRB_TRY (GrB_assign (random_v, NULL, NULL, 0, GrB_ALL, e, NULL)) ;
-    GRB_TRY (GrB_Vector_apply_IndexOp_INT64 (ramp_v, NULL, NULL,
+    GRB_TRY (GrB_Vector_apply_IndexOp_UINT64 (ramp_v, NULL, NULL,
         GrB_ROWINDEX_INT64, random_v, 1, NULL)) ;
-    GRB_TRY (GrB_Vector_apply (half_ramp, NULL, NULL, half, ramp_v, NULL)) ;
+    //QUESTION: Is this correct?
+    GRB_TRY (GrB_Vector_apply_BinaryOp2nd_UINT64(
+        half_ramp, NULL, NULL, GrB_DIV_UINT64, ramp_v, 2UL, NULL)) ;
     GRB_TRY (GxB_Vector_unpack_Full (
         ramp_v, ramp, e * sizeof(GrB_Index), NULL, NULL)) ;
     GRB_TRY (GxB_Vector_unpack_Full (
         hramp_v, half_ramp, e * sizeof(GrB_Index), NULL, NULL)) ;
-
+    
     //TODO Change seed
     LG_TRY(
         LAGraph_Random_Seed(random_v, 15489451345495616ul, msg));
@@ -259,10 +261,14 @@ int LAGraph_HelloWorld // a simple algorithm, just for illustration
         //   2   | 0,1 | 2,3
         //   3   | 0,1 | 3,2
         // This gives us randomization as to which type of swap is happening.
-        // M = E * pairs (any_bxor)
+        // M = E * pairs (any_lxor)
         GRB_TRY (GrB_mxm(M, NULL, NULL, GxB_ANY_LXOR_INT8, E, pairs, NULL)) ;
+
         // remove any entries of M with less than 3 values
+
         // This is taken from LAGraph_Cached_OutDegree. 
+        // TODO: Should there be a function that takes in A matrix and computes
+        // in or out degree 
         
         
         GRB_TRY (GrB_mxv (M_outdeg, NULL, NULL, LAGraph_plus_one_int64,
@@ -298,13 +304,18 @@ int LAGraph_HelloWorld // a simple algorithm, just for illustration
         // M = d_interf * M (any_[z = 4 * (x > 2) | y]) 
         // M = select M (x & 4 == 0)
 
+
+        // M_1 has 2 and 0 M_2 has 1 and 3. Divide by 2 to get 0 and 1 on both.
         // M1 = select M (x & 1 == 0) / 2
-        GRB_TRY (GrB_Matrix_select_UINT8(
-            M_1, NULL, NULL, first_bit, M_t, 0, GrB_DESC_R)) ;
         // M2 = select M (x & 1 == 1) / 2
         GRB_TRY (GrB_Matrix_select_UINT8(
+            M_1, NULL, NULL, first_bit, M_t, 0, GrB_DESC_R)) ;
+        GRB_TRY (GrB_Matrix_select_UINT8(
             M_2, NULL, NULL, first_bit, M_t, 1, GrB_DESC_R)) ;
-
+        GRB_TRY (GrB_Vector_apply_BinaryOp2nd_UINT64(
+            M_1, NULL, NULL, GrB_DIV_UINT64, M_1, 2UL, NULL)) ;
+        GRB_TRY (GrB_Vector_apply_BinaryOp2nd_UINT64(
+            M_2, NULL, NULL, GrB_DIV_UINT64, M_2, 2UL, NULL)) ;
         // Check if an edge already exists in the graph.
         // If a row of M1 or M2 has more than 1 vertex in common with a 
         // row of E, the value of that entry in the exists array will be 2. 
@@ -319,7 +330,9 @@ int LAGraph_HelloWorld // a simple algorithm, just for illustration
         // 2 if intended swap already exists in the matrix, 1 or noval otherwise
         GRB_TRY (GrB_Matrix_reduce_Monoid(
             r_exists, NULL, NULL, GrB_MAX_MONOID_UINT8, exists, GrB_DESC_R));
+        // TODO: remove r_exists
 
+        // This May not be neccesary.
         // Compute S. note we could do ST if its better.
         // pairs |  M  |  S
         //   0   | 0,1 | 0,1
@@ -329,10 +342,17 @@ int LAGraph_HelloWorld // a simple algorithm, just for illustration
         // S = pairsT * M (any_[z = (x & 2) ^ y])
         // S = extract S (x & 2 == 0)
 
+        // If I've been prunning pairs along with M, 
         // If S has a row, Remove it from E and replace with the row from S
-        // QUESTION
+        // QUESTION: the order of the edges being kept is unimportant so is it 
+        // easier to "concatinate" a GrB_extract'ed E with M?
+        // AH GxB_Matrix_concat?
+        // Then E = Concat(E_prime, M_1, M_2)
+        // where E_prime contains no edges in the indegree of pairs after it is 
+        // pruned
 
-        // update E and possibly ET
+        //Maintain random Vector
+        LG_TRY (LAGraph_Random_Next(random_v, msg)) ;
     } 
 
     LG_FREE_WORK ;
