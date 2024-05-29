@@ -76,6 +76,16 @@ void two_one_add(uint64_t *z, const uint64_t *x, const uint64_t *y)
     (*z) = 2 * (*x) + (*y);
 }
 
+#define ISEQ_2ISLT                                                          \
+    "void iseq_2islt(uint64_t *z, const uint64_t *x, const uint64_t *y)"    \
+    "{"                                                                     \
+        "(*z) = (*x < *y) + (*x <= *y) ;"                                   \
+    "}"
+void iseq_2islt(uint64_t *z, const uint64_t *x, const uint64_t *y)
+{
+    (*z) = (uint64_t)((*x < *y) + (*x <= *y)) ;
+}
+
 #define RICH_CLUB_FORMULA                                                      \
     "void rich_club_formula(double *z, const uint64_t *x, const uint64_t *y)"  \
     "{"                                                                        \
@@ -139,6 +149,12 @@ int LAGraph_RichClubCoefficient
     // 2x+y
     GrB_BinaryOp two_one = NULL;
 
+    // 2 * (x > y) + (x == y)
+    GrB_BinaryOp iseq_2lt = NULL;
+
+    // [+].[iseq_2lt]
+    GrB_Semiring plus_2le;
+
     // 2E_K / (N_k (N_k -1))
     GrB_BinaryOp rcCalculation = NULL;
 
@@ -177,7 +193,7 @@ int LAGraph_RichClubCoefficient
     LG_ASSERT_MSG (G->out_degree != NULL, GrB_EMPTY_OBJECT,
         "G->out_degree must be defined") ;
     LG_ASSERT_MSG (G->nself_edges == 0, GrB_INVALID_VALUE, 
-        "G->nself_edges must be zero") ;
+        "G->nself_edges must be zero") ; // Probably overkill
 
     //--------------------------------------------------------------------------
     // Initializations
@@ -196,10 +212,13 @@ int LAGraph_RichClubCoefficient
         &two_one, (LAGraph_binary_function) (&two_one_add), 
         GrB_UINT64, GrB_UINT64, GrB_UINT64, "two_one_add", TWO_ONE_ADD)) ;
     GRB_TRY(GxB_BinaryOp_new(
+        &iseq_2lt, (LAGraph_binary_function) (&iseq_2islt), 
+        GrB_UINT64, GrB_UINT64, GrB_UINT64, "iseq_2islt", ISEQ_2ISLT)) ;
+    GRB_TRY(GrB_Semiring_new(&plus_2le, GrB_PLUS_MONOID_UINT64, iseq_2lt)) ;
+    GRB_TRY(GxB_BinaryOp_new(
         &rcCalculation, (LAGraph_binary_function) (&rich_club_formula), 
         GrB_UINT64, GrB_UINT64, GrB_UINT64, 
         "rich_club_formula", RICH_CLUB_FORMULA)) ;
-            
     // degrees = G->out_degree
     GRB_TRY (GrB_assign(
         degrees, NULL, NULL, G->out_degree, GrB_ALL, n, NULL)) ;
@@ -209,7 +228,7 @@ int LAGraph_RichClubCoefficient
     // Each edge in the graph gets the value of the degree of its column node
     GRB_TRY (GrB_mxm(
         edge_degrees, NULL, NULL, GxB_ANY_SECOND_UINT64,A,D, GrB_NULL)) ;
-    
+    /* 
     // QUESTION: Mentioned GxB would be slower than JIT correct?
 
     // Counts the edges for which its row node is the node of smallest degree.
@@ -236,20 +255,14 @@ int LAGraph_RichClubCoefficient
     GRB_TRY(GrB_eWiseMult(
         edge_adjusted_deg, NULL, NULL, two_one, 
         edge_gt_deg, edge_eq_deg, GrB_NULL));
-
-    /* 
-    // Actually why not do this, and skip an operation?
-
-    GRB_TRY(GrB_vxm(
-        edge_gt_deg, NULL, NULL, GxB_PLUS_ISLT_UINT64, 
-        degrees, edge_degrees, GrB_NULL)) ;
-    GRB_TRY(GrB_vxm(
-        edge_gt_deg, NULL, two_one_add, GxB_PLUS_ISEQ_UINT64, 
-        degrees, edge_degrees, GrB_NULL)) ;
-
-    // --- Okay well at that point why not just do it all in one multiply? ---
-    // with this semiring [+].[(x == y) + 2 * (x < y)]
      */
+
+    // If the nodes of an edge have different degrees, the edge is counted once.
+    // If they have the same degree, that edge is double counted. So, we adjust:
+    // edge_adjusted_deg = 2 * (x > y) + (x == y)
+    GRB_TRY(GrB_vxm(
+        edge_adjusted_deg, NULL, NULL, plus_2le, 
+        degrees, edge_degrees, GrB_NULL)) ;
 
     GRB_TRY(GrB_Vector_nvals (&edge_vec_nvals, edge_adjusted_deg));
     vi_size = (edge_vec_nvals+1)*sizeof(GrB_Index);
@@ -258,7 +271,7 @@ int LAGraph_RichClubCoefficient
     GRB_TRY(GxB_Vector_unpack_CSC(
         edge_adjusted_deg, &index_edge, (void **) &edge_count_per_node,
         &vi_size,&vx_size,&iso,&edge_vec_nvals,NULL, GrB_NULL));
-    LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
+    LG_TRY (LAGraph_Free((void **)&index_edge, NULL)) ;
 
     GRB_TRY(GxB_Vector_unpack_CSC(
         degrees, &index_edge, (void **) &deg_arr,
@@ -290,7 +303,7 @@ int LAGraph_RichClubCoefficient
     // [9,7,7,7,7,7,3,2,2,2, . . .]
 
     uint64_t index = 0, i = 0;
-    LAGraph_Malloc((void **) &cumul_array, n, sizeof(uint64_t), msg) ;
+    LG_TRY (LAGraph_Malloc((void **) &cumul_array, n, sizeof(uint64_t), msg)) ;
 
     for(; i < n; i++) // seems easily parrallelizable but idk if #pragma is enough.
     {
@@ -302,9 +315,9 @@ int LAGraph_RichClubCoefficient
                 break ;
         }
     }
-    // QUESTION: should this be i - 1? Do I build ramp in the forloop above?
-    GRB_TRY(GrB_Vector_build(
-        cumulative_edges, ramp, cumul_array, i, NULL
+    // QUESTION: 
+    GRB_TRY(GxB_Vector_pack_Full(
+        cumulative_edges, cumul_array, n * sizeof(uint64_t), false, NULL
     )) ;
 
 
