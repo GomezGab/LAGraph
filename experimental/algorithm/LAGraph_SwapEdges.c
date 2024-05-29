@@ -136,15 +136,22 @@ int LAGraph_SwapEdges
 
     GrB_Index num_swaps = 0, num_attempts = 0 ; 
     // QUESTION: Should this decrease if edges are interfering alot?
-    GrB_Index swaps_per_loop = e / 3 ; // 1/3 reasonable?
+    // Bound number of swaps by E-2 * (max deg)?
+    // Yes might be good to decrease this if you get alot of intrf
+    // or increase if intrf low
+    // maybe a * #swaps that worked last iteration
+    GrB_Index swaps_per_loop = e / 3 ; // Make this a cap
 
+    // TODO: if swaps change these have to be done inside the loop
     GRB_TRY (GrB_Matrix_new(&pairs, GrB_UINT8, e, swaps_per_loop)) ; 
     GRB_TRY (GrB_Matrix_new(&M, GrB_UINT8, n, swaps_per_loop)) ; 
 
+    // TODO: double check this swaps *2 or e??
+    GRB_TRY (GrB_Vector_new(&random_v, GrB_UINT64, e)) ;
+    GRB_TRY (GrB_Vector_new(&r_permute, GrB_UINT64, e)) ;
+    GRB_TRY (GrB_Vector_new(&r_sorted, GrB_UINT64, e)) ;
 
-    GRB_TRY (GrB_Vector_new(&random_v, GrB_UINT64, swaps_per_loop * 2)) ;
-    GRB_TRY (GrB_Vector_new(&r_permute, GrB_UINT64, swaps_per_loop * 2)) ;
-    GRB_TRY (GrB_Vector_new(&r_sorted, GrB_UINT64, swaps_per_loop * 2)) ;
+
     GRB_TRY (GrB_Vector_new(&ramp_v, GrB_UINT64, swaps_per_loop * 2)) ;
     GRB_TRY (GrB_Vector_new(&hramp_v, GrB_UINT64, swaps_per_loop * 2)) ;
     GRB_TRY (GrB_Vector_new (&M_outdeg, GrB_INT64, n)) ;
@@ -235,8 +242,11 @@ int LAGraph_SwapEdges
         //GrB_Vector_apply(r_sorted, NULL, NULL, GrB_UnaryOp, r_sorted, GrB_DESC_R) ;
         // NOTE: Small typo on 6.11.6. Refers to vb even though its not a bitmap
         // Also 
+        // TODO: handle memory
+        GrB_Index edge_perm_size;
+        // TODO: try and make this more efficient
         GRB_TRY (GxB_Vector_unpack_Full(
-            r_permute, edge_perm, e * sizeof(GrB_Index), iso, GrB_NULL
+            r_permute, (void **)&edge_perm, &edge_perm_size, NULL, NULL
         )) ;
 
 
@@ -250,8 +260,9 @@ int LAGraph_SwapEdges
             //      vals[i] += vals[i] > vals[i-1]
         // I know it will be alot less safe but is it more efficient to pack
         // pairs as needed? Doubt it.
+        // nvals is wrong
         GRB_TRY (GrB_Matrix_build_UINT8(
-            pairs, edge_perm, half_ramp, vals, swaps_per_loop, GrB_NULL
+            pairs, edge_perm, half_ramp, vals, swaps_per_loop * 2, NULL
         )) ;
 
 
@@ -274,8 +285,8 @@ int LAGraph_SwapEdges
         GRB_TRY (GrB_mxv (M_outdeg, NULL, NULL, LAGraph_plus_one_int64,
             M, x, NULL)) ; 
 
-        // QUESTION: Is the following method correct? Do I need a new M with the 
-        // correct dimension?
+        // QUESTION: Do I need a new M with the correct dimension?
+        // YES TODO
         GRB_TRY (GrB_Vector_select_UINT8(
             M_outdeg, NULL, NULL, GrB_EQ_INT8, M_outdeg, 4, NULL)) ;
         GRB_TRY (GrB_Vector_nvals(&n_4degree,M_outdeg)) ;
@@ -284,8 +295,9 @@ int LAGraph_SwapEdges
         GrB_Index junk_size;
         GRB_TRY (GrB_Vector_unpack_CSC(
             M_outdeg, &deg_keep, &junk, &n_4degree, &junk_size, NULL)) ;
+        // TODO: replace the 0 and M with correct size
         GRB_TRY (GrB_Matrix_extract(
-            M, NULL, NULL, M, NULL, 0, deg_keep, n_4degree, NULL)) ;
+            M, NULL, NULL, M, GrB_ALL, 0, deg_keep, n_4degree, NULL)) ;
 
 
         // interf <!diagonal> = M*MT(plus_one)
