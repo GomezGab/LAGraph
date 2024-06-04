@@ -51,17 +51,17 @@ matrix_info ;
 
 const matrix_info tests [ ] = {
     // random, preserve, combine
-    {10, 0.3, 55, LAGraph_Matching_random, 1, 1, "small-random-preserve-combine"},
-    {500, 0.4, 16, LAGraph_Matching_random, 1, 1, "large-random-preserve-combine"},
+    {10, 0.3, 55, LAGraph_Matching_unweighted, 1, 1, "small-random-preserve-combine"},
+    {500, 0.4, 16, LAGraph_Matching_unweighted, 1, 1, "large-random-preserve-combine"},
     // random, preserve, nocombine
-    {10, 0.3, 62, LAGraph_Matching_random, 1, 0, "small-random-preserve-nocombine"},
-    {500, 0.4, 21, LAGraph_Matching_random, 1, 0, "large-random-preserve-nocombine"},
+    {10, 0.3, 62, LAGraph_Matching_unweighted, 1, 0, "small-random-preserve-nocombine"},
+    {500, 0.4, 21, LAGraph_Matching_unweighted, 1, 0, "large-random-preserve-nocombine"},
     // random, nopreserve, combine
-    {10, 0.3, 23, LAGraph_Matching_random, 0, 1, "small-random-nopreserve-combine"},
-    {500, 0.4, 31, LAGraph_Matching_random, 0, 1, "large-random-nopreserve-combine"},
+    {10, 0.3, 23, LAGraph_Matching_unweighted, 0, 1, "small-random-nopreserve-combine"},
+    {500, 0.4, 31, LAGraph_Matching_unweighted, 0, 1, "large-random-nopreserve-combine"},
     // random, nopreserve, nocombine
-    {10, 0.3, 92, LAGraph_Matching_random, 0, 0, "small-random-nopreserve-nocombine"},
-    {500, 0.4, 44, LAGraph_Matching_random, 0, 0, "large-random-nopreserve-nocombine"},
+    {10, 0.3, 92, LAGraph_Matching_unweighted, 0, 0, "small-random-nopreserve-nocombine"},
+    {500, 0.4, 44, LAGraph_Matching_unweighted, 0, 0, "large-random-nopreserve-nocombine"},
 
     // same as above except weighted matching (mix of light and heavy)
     // random, preserve, combine
@@ -76,7 +76,6 @@ const matrix_info tests [ ] = {
     // random, nopreserve, nocombine
     {10, 0.3, 92, LAGraph_Matching_heavy, 0, 0, "small-random-nopreserve-nocombine"},
     {500, 0.4, 44, LAGraph_Matching_light, 0, 0, "large-random-nopreserve-nocombine"},
-
     {0, 0, 0, 0, 0, 0, ""}
 } ;
 
@@ -89,6 +88,7 @@ char msg [LAGRAPH_MSG_LEN] ;
 void test_Coarsen_Matching () {
 
     OK (LAGraph_Init (msg)) ;
+//  GrB_set (GrB_GLOBAL, (int32_t) (true), GxB_BURBLE) ;
     OK (LAGraph_Random_Init (msg)) ;
 
 #if LAGRAPH_SUITESPARSE
@@ -212,16 +212,32 @@ void test_Coarsen_Matching () {
             OK (LAGraph_Free ((void**)(&freq), msg)) ;
 
 #if 0
-            OK (LAGraph_Matrix_Print (G->A, LAGraph_COMPLETE, stdout, msg)) ;
+//          OK (LAGraph_Matrix_Print (G->A, LAGraph_COMPLETE, stdout, msg)) ;
             OK (LAGraph_Matrix_Print (A_coarse_LAGraph, LAGraph_COMPLETE, stdout, msg)) ;
             OK (LAGraph_Matrix_Print (A_coarse_naive, LAGraph_COMPLETE, stdout, msg)) ;
-            OK (LAGraph_Vector_Print (parent[0], LAGraph_COMPLETE, stdout, msg)) ;
-            OK (LAGraph_Vector_Print (newlabels[0], LAGraph_COMPLETE, stdout, msg)) ;
+//          OK (LAGraph_Vector_Print (parent[0], LAGraph_COMPLETE, stdout, msg)) ;
+//          OK (LAGraph_Vector_Print (newlabels[0], LAGraph_COMPLETE, stdout, msg)) ;
 #endif
-            OK (LAGraph_Matrix_IsEqual (&ok, A_coarse_LAGraph, A_coarse_naive, msg)) ;
-            TEST_CHECK (ok) ;
+            GrB_Matrix Delta ;
+            GrB_Index ncoarse ;
+            GrB_Matrix_nrows (&ncoarse, A_coarse_LAGraph) ;
+            GrB_Matrix_new (&Delta, GrB_FP64, ncoarse, ncoarse) ;
+            GrB_eWiseAdd (Delta, NULL, NULL, GrB_MINUS_FP64, A_coarse_LAGraph, A_coarse_naive,
+                NULL) ;
+            GrB_apply (Delta, NULL, NULL, GrB_ABS_FP64, Delta, NULL) ;
+//          OK (LAGraph_Matrix_Print (Delta, LAGraph_COMPLETE, stdout, msg)) ;
+            double error = 0 ;
+            GrB_reduce (&error, NULL, GrB_MAX_MONOID_FP64, Delta, NULL) ;
+
+//          this test is wrong, it does not allow for floating point roundoff
+//          OK (LAGraph_Matrix_IsEqual (&ok, A_coarse_LAGraph, A_coarse_naive, msg)) ;
+//          TEST_CHECK (ok) ;
+
+//          printf ("error: %g\n", error) ;
+            TEST_CHECK (error < 1e-12) ;
             TEST_MSG ("Coarsened matrices do not match for test: %s", tests [k].name) ;
 
+            OK (GrB_free (&Delta)) ;
             OK (GrB_free (&A_coarse_LAGraph)) ;
             OK (GrB_free (&A_coarse_naive)) ;
 
