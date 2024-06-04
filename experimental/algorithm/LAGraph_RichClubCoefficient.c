@@ -288,7 +288,7 @@ int LAGraph_RichClubCoefficient
     GRB_TRY(GrB_Vector_build (
         cumulative_deg, deg_arr, ones, n, GrB_PLUS_INT64)) ;
     GRB_TRY(GxB_Vector_unpack_CSC(
-        edges_per_deg, &index_edge, &edges_per_deg_arr,
+        edges_per_deg, &index_edge, (void **)&edges_per_deg_arr,
         &vi_size, &vx_size, &iso, &edge_vec_nvals, NULL, GrB_NULL));
     
     //run a cummulative sum (backwards) on edges_per_deg_arr
@@ -315,9 +315,9 @@ int LAGraph_RichClubCoefficient
                 break ;
         }
     }
-    // QUESTION: 
+    // QUESTION:  will this pack work or do I need something like a build?
     GRB_TRY(GxB_Vector_pack_Full(
-        cumulative_edges, cumul_array, n * sizeof(uint64_t), false, NULL
+        cumulative_edges, (void **)&cumul_array, n * sizeof(uint64_t), false, NULL
     )) ;
 
 
