@@ -285,6 +285,7 @@ int LAGraph_RichClubCoefficient
 
     // Start ones. Do I do this by building an iso vector? or by myself?
     // QUESTION: I want to do the following. I should duplicate deg_arr memory correct?
+    // This is safe. build doesn't take ur mem
     GRB_TRY(GrB_Vector_build (
         cumulative_deg, deg_arr, ones, n, GrB_PLUS_INT64)) ;
     GRB_TRY(GxB_Vector_unpack_CSC(
@@ -300,7 +301,7 @@ int LAGraph_RichClubCoefficient
     //Construct a vector thats has edges_per_deg_arr values but repeated whenever 
     //index_edge has a skip and put into cumulative edges
     // ie. [0,1,6,7,10] & [9,7,3,2,0] ->
-    // [9,7,7,7,7,7,3,2,2,2, . . .]
+    // [9,7,7,7,7,7,3,2,2,2,. . . ]
 
     uint64_t index = 0, i = 0;
     LG_TRY (LAGraph_Malloc((void **) &cumul_array, n, sizeof(uint64_t), msg)) ;
@@ -314,13 +315,13 @@ int LAGraph_RichClubCoefficient
             if(index == edge_vec_nvals || edges_per_deg_arr[index] == 0)
                 break ;
         }
-    }
+    } 
     // QUESTION:  will this pack work or do I need something like a build?
+    // TODO: fix this is not full
+    // could make cumulative_edges smaller
     GRB_TRY(GxB_Vector_pack_Full(
-        cumulative_edges, (void **)&cumul_array, n * sizeof(uint64_t), false, NULL
-    )) ;
-
-
+        cumulative_edges, (void **)&cumul_array,
+        n * sizeof(uint64_t), false, NULL)) ;
 
     //GrB select or just do an if test
     LG_FREE_WORK ;
