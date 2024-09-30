@@ -290,6 +290,18 @@ int LAGraph_Incidence_Matrix
     char *msg
 ) ;
 
+//------------------------------------------------------------------------------
+// LAGraph_RichClubCoefficient: Compute Rich Club Coefficient of Graph
+//------------------------------------------------------------------------------
+
+LAGRAPHX_PUBLIC
+int LAGraph_RichClubCoefficient
+(
+    GrB_Vector *rich_club_coefficents, //output
+    LAGraph_Graph G, //input graph
+    char *msg
+) ;
+
 //****************************************************************************
 // Algorithms
 //****************************************************************************
