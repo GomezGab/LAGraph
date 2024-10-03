@@ -116,9 +116,11 @@ void test_RichClubCoefficient (void)
         // check results
         //----------------------------------------------------------------------
         double comp_val = 0;
-        for(uint64_t i = 0; i < n_ans; ++i)
-            TEST_CHECK (GrB_Vector_extractElement(&comp_val, rcc, i+1) == GrB_NO_VALUE 
-                || comp_val == ans[i]) ;
+        for(int64_t i = n_ans - 1; i >= 0; --i)
+        {
+            GrB_Vector_extractElement(&comp_val, rcc, i) ;
+            TEST_CHECK (comp_val == ans[i]) ;
+        }
         GxB_Vector_fprint (rcc, "rcc", GxB_SHORT, stdout);
         OK (GrB_free (&rcc)) ;
         OK (LAGraph_Delete (&G, msg)) ;

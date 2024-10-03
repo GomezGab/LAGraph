@@ -151,12 +151,11 @@ int LAGraph_RichClubCoefficient
     GrB_Index edge_vec_nvals;
     GrB_Index deg_vec_size;
     bool iso = false;
-
-    GrB_Index *index_edge = NULL;
     
     uint64_t *node_edges_arr = NULL, *deg_arr = NULL, 
         *edges_per_deg_arr = NULL, *cumul_array = NULL, *ones = NULL, 
         *deg_vertex_count = NULL;
+    GrB_Index *index_edge = NULL;
 
     //--------------------------------------------------------------------------
     // Check inputs
@@ -212,7 +211,7 @@ int LAGraph_RichClubCoefficient
     GRB_TRY (GrB_mxm(
         edge_degrees, A, NULL, GxB_ANY_FIRST_UINT64,D,A, GrB_DESC_S)) ;
 
-    // QUESTION: Is it not more fficient to simply use min here and then count up?
+    // QUESTION: Is it not more efficient to simply use min here and then count up?
     GRB_TRY(GrB_mxm(
         edge_degrees, NULL, NULL, plus_2le, edge_degrees, D, GrB_NULL)) ;
 
@@ -227,22 +226,43 @@ int LAGraph_RichClubCoefficient
     GRB_TRY(GrB_Vector_nvals (&edge_vec_nvals, node_edges));
     vi_size = (edge_vec_nvals+1)*sizeof(GrB_Index);
     vx_size = (edge_vec_nvals+1)*sizeof(GrB_UINT64);
+/* 
+    // Grab the index and edge count arrays from GBLASn with a bitmap incase
+    // there are empties 
+    //QUESTION: is it worth it to just fill these vectors?
+    GRB_TRY(GxB_Vector_unpack_Bitmap(
+        node_edges, &index_edge, (void **) &node_edges_arr,
+        &vi_size,&vx_size,&iso,&edge_vec_nvals, GrB_NULL)) ;
+    LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
 
+    //QUESTION: iso edge case
+    LG_ASSERT (!iso, GrB_NOT_IMPLEMENTED) ;
+
+
+    GRB_TRY(GxB_Vector_unpack_Bitmap(
+        degrees, &index_edge, (void **) &deg_arr,
+        &vi_size,&vx_size,&iso,&deg_vec_size, GrB_NULL)) ; 
+    LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
+    LG_ASSERT (!iso, GrB_NOT_IMPLEMENTED) ;
+ */
+    //CSC unpack QUESTION
     // Grab the index and edge count arrays from GBLAS
-    // Jubled NULL so must return sorted. Needed because arrays with 
+    // Jumbled NULL so must return sorted. Needed because arrays with 
     // # of edges and # of degrees should line up.
 
-    GRB_TRY(GxB_Vector_unpack_CSC(
+     GRB_TRY(GxB_Vector_unpack_CSC(
         node_edges, &index_edge, (void **) &node_edges_arr,
-        &vi_size,&vx_size,&iso,&edge_vec_nvals,NULL, GrB_NULL)) ;
+        &vi_size,&vx_size,&iso,&edge_vec_nvals, NULL, NULL)) ;
     LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
-
-    //TODO: adjust degrees over by one
+    //QUESTION: better way to adjust degrees over by one?
+    
+    GRB_TRY(GrB_assign (degrees, degrees, GrB_MINUS_UINT64, 1, GrB_ALL, 0, GrB_DESC_S));
     GRB_TRY(GxB_Vector_unpack_CSC(
         degrees, &index_edge, (void **) &deg_arr,
-        &vi_size,&vx_size,&iso,&deg_vec_size,NULL, GrB_NULL)) ;
+        &vi_size,&vx_size,&iso,&deg_vec_size, NULL, NULL)) ; 
 
     LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
+   
 
     // TODO change what this throws
     LG_ASSERT (edge_vec_nvals == deg_vec_size, GrB_NULL_POINTER) ;
@@ -251,6 +271,7 @@ int LAGraph_RichClubCoefficient
     GRB_TRY(GrB_Vector_build (
         edges_per_deg, deg_arr, node_edges_arr, deg_vec_size, 
         GrB_PLUS_UINT64)) ;
+
     // TODO: Make ones array in a better way
     LG_TRY(
         LAGraph_Malloc((void **) &ones, deg_vec_size, sizeof(u_int64_t), NULL)) ;
@@ -263,10 +284,10 @@ int LAGraph_RichClubCoefficient
     GrB_Index *epd_index = NULL,  *vpd_index = NULL;
     GRB_TRY(GxB_Vector_unpack_CSC(
         edges_per_deg, &epd_index, (void **)&edges_per_deg_arr,
-        &vi_size, &vx_size, &iso, &edge_vec_nvals, NULL, GrB_NULL)) ;
+        &vi_size, &vx_size, &iso, &edge_vec_nvals, NULL, NULL)) ;
     GRB_TRY(GxB_Vector_unpack_CSC(
         verts_per_deg, &vpd_index, (void **)&deg_vertex_count,
-        &vi_size, &vx_size, &iso, &deg_vec_size, NULL, GrB_NULL)) ;
+        &vi_size, &vx_size, &iso, &deg_vec_size, NULL, NULL)) ;
 
     //run a cummulative sum (backwards) on deg_vertex_count
     for(uint64_t i = deg_vec_size - 1; i > 0; --i)
@@ -281,6 +302,7 @@ int LAGraph_RichClubCoefficient
     }
 
     // QUESTION: can I just tell GBLAS the arrays are one smaller than they are?
+    // Feels unsafe but it will just deallocate with a delete[] no?
     // prevent division by zero by removing a possible one from the 
     // verts_per_deg
     GrB_Index to_remove = deg_vertex_count[deg_vec_size - 1] == 1? 
@@ -289,10 +311,10 @@ int LAGraph_RichClubCoefficient
     //re pack but now we're cummulative
     GRB_TRY(GxB_Vector_pack_CSC(
         edges_per_deg, &epd_index, (void **)&edges_per_deg_arr,
-        vi_size, vx_size, false, edge_vec_nvals, NULL, GrB_NULL));
+        vi_size, vx_size, false, edge_vec_nvals, NULL, NULL));
     GRB_TRY(GxB_Vector_pack_CSC(
         verts_per_deg, &vpd_index, (void **)&deg_vertex_count,
-        vi_size, vx_size, false, deg_vec_size, NULL, GrB_NULL));
+        vi_size, vx_size, false, deg_vec_size, NULL, NULL));
     //GxB_Vector_fprint (verts_per_deg, "vpd", GxB_SHORT, stdout);
     if(to_remove > 0) 
         GRB_TRY(GrB_Vector_removeElement(verts_per_deg, to_remove));
