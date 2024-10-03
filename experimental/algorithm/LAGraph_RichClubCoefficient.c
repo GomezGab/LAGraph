@@ -19,11 +19,10 @@
 // to normalize the coefficients in a graph.
 
 // Given a Symetric Graph with no self edges, LAGraph_RichClubCoefficient will
-// first randomized edges without changing the degree pattern and will then 
-// calculate the rich club coefficients of the resulting graph.
+// calculate the rich club coefficients of the graph. 
 
-// The values will be output as a dense GrB_Vector, the rich club coefficient 
-// of the kth degree found at entry k.
+// The values will be output as a sparse GrB_Vector, the rich club coefficient 
+// of k will be found at the closeste entry at or above k.
 
 // References:
 
@@ -255,7 +254,7 @@ int LAGraph_RichClubCoefficient
         &vi_size,&vx_size,&iso,&edge_vec_nvals, NULL, NULL)) ;
     LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
     //QUESTION: better way to adjust degrees over by one?
-    
+
     GRB_TRY(GrB_assign (degrees, degrees, GrB_MINUS_UINT64, 1, GrB_ALL, 0, GrB_DESC_S));
     GRB_TRY(GxB_Vector_unpack_CSC(
         degrees, &index_edge, (void **) &deg_arr,
