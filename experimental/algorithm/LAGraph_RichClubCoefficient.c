@@ -208,7 +208,7 @@ int LAGraph_RichClubCoefficient
     // QUESTION: does this Mask help out GBLAS?
     // Each edge in the graph gets the value of the degree of its column node
     GRB_TRY (GrB_mxm(
-        edge_degrees, A, NULL, GxB_ANY_FIRST_UINT64,D,A, GrB_DESC_S)) ;
+        edge_degrees, NULL, NULL, GxB_ANY_FIRST_UINT64,D,A, NULL)) ;
 
     // QUESTION: Is it not more efficient to simply use min here and then count up?
     GRB_TRY(GrB_mxm(
