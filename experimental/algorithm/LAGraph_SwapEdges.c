@@ -15,48 +15,46 @@
 
 //------------------------------------------------------------------------------
 
-
-#define LG_FREE_WORK                        \
-{                                           \
-    /* free any workspace used here */      \
-    GrB_free (&E) ;                         \
-    GrB_free (&E_t) ;                       \
-    GrB_free (E_arranged) ;                 \
-    GrB_free (E_arranged + 1) ;             \
-    GrB_free (E_arranged + 2) ;             \
-    GrB_free (&pairs) ;                     \
-    GrB_free (&pairs_4s) ;                  \
-    GrB_free (&pairs_i) ;                   \
-    GrB_free (&pairs_new) ;                 \
-    GrB_free (&M) ;                         \
-    GrB_free (&M_fours) ;                   \
-    GrB_free (&M_i) ;                       \
-    GrB_free (&M_t) ;                       \
-    GrB_free (&interf) ;                    \
-    GrB_free (&M_1) ;                       \
-    GrB_free (&M_2) ;                       \
-    GrB_free (&exists) ;                    \
-    GrB_free (&E_half) ;                    \
-    GrB_free (&A_tril) ;                    \
-    GrB_free (&random_v) ;                  \
-    GrB_free (&r_permute) ;                 \
-    GrB_free (&r_sorted) ;                  \
-    GrB_free (&swapVals) ;                  \
-    GrB_free (&ramp_v) ;                    \
-    GrB_free (&hramp_v) ;                   \
-    /* row_indices) ;                         
-    col_indices) ;                         
-    void *values) ;                          
-    GrB_Index *ramp) ;                         
-    GrB_Index *half_ramp) ;                         
-    GrB_Index *edge_perm) ;                         
-    uint8_t *swap_type) ; */                \
-    GrB_free (&M_outdeg) ;                  \
-    GrB_free (&r_interf) ;                  \
-    GrB_free (&r_exists) ;                  \
-    GrB_free (&r_pairs) ;                   \
-    GrB_free (&x) ;                         \
-    GrB_free (&first_bit) ;                 \
+#define LG_FREE_WORK                            \
+{                                               \
+    /* free any workspace used here */          \
+    GrB_free (&E) ;                             \
+    GrB_free (&E_t) ;                           \
+    GrB_free (E_arranged) ;                     \
+    GrB_free (E_arranged + 1) ;                 \
+    GrB_free (E_arranged + 2) ;                 \
+    GrB_free (&pairs) ;                         \
+    GrB_free (&pairs_4s) ;                      \
+    GrB_free (&pairs_i) ;                       \
+    GrB_free (&pairs_new) ;                     \
+    GrB_free (&M) ;                             \
+    GrB_free (&M_fours) ;                       \
+    GrB_free (&M_i) ;                           \
+    GrB_free (&M_t) ;                           \
+    GrB_free (&interf) ;                        \
+    GrB_free (&M_1) ;                           \
+    GrB_free (&M_2) ;                           \
+    GrB_free (&exists) ;                        \
+    GrB_free (&E_half) ;                        \
+    GrB_free (&A_tril) ;                        \
+    GrB_free (&random_v) ;                      \
+    GrB_free (&r_permute) ;                     \
+    GrB_free (&r_sorted) ;                      \
+    GrB_free (&swapVals) ;                      \
+    GrB_free (&ramp_v) ;                        \
+    GrB_free (&hramp_v) ;                       \
+    LAGraph_Free((void**)&row_indices, msg) ;   \
+    LAGraph_Free((void**)&values, msg) ;        \
+    LAGraph_Free((void**)&ramp, msg) ;          \
+    LAGraph_Free((void**)&half_ramp, msg) ;     \
+    LAGraph_Free((void**)&edge_perm, msg) ;     \
+    LAGraph_Free((void**)&swap_type, msg) ;     \
+    GrB_free (&M_outdeg) ;                      \
+    GrB_free (&r_interf) ;                      \
+    GrB_free (&r_exists) ;                      \
+    GrB_free (&r_pairs) ;                       \
+    GrB_free (&x) ;                             \
+    GrB_free (&first_bit) ;                     \
     }
 
 #define LG_FREE_ALL                         \
@@ -64,6 +62,7 @@
     /* free any workspace used here */      \
     LG_FREE_WORK ;                          \
     /* free all the output variable(s) */   \
+    GrB_free(A_new) ;                       \
     /* take any other corrective action */  \
 }
 
@@ -71,28 +70,28 @@
 #include "LAGraphX.h"
 
 void first_bit_equals 
-    (bool *z, const uint8_t *x, GrB_Index i, GrB_Index j, const uint8_t *bit)
+    (uint8_t *z, const uint8_t *x, int64_t i, int64_t j,  const uint8_t *bit)
     {
         (*z) = ((*x) & 1) == (*bit);
     }
 #define FIRST_BIT_EQ                                                            \
 "void first_bit_equals"                                                         \
-    "(bool *z, const uint8_t *x, GrB_Index i, GrB_Index j, const uint8_t *bit)" \
+    "(uint8_t *z, const uint8_t *x, int64_t i, int64_t j,  const uint8_t *bit)" \
     "{"                                                                         \
         "(*z) = ((*x) & 1) == (*bit);"                                          \
     "}"
 
 // creates [0,3,1,2,1,3,. . .] pattern from random vector.
 void swap_pattern 
-    (uint8_t *z, const uint8_t *x, GrB_Index i, GrB_Index j, const uint8_t *y)
+    (uint8_t *z, const uint64_t *x, int64_t i, int64_t j, const uint8_t *y)
     {
         (*z) = ((i % 2) * 2) | (*x & 1);
     }
 #define SWAP_PAT                                                                \
 "void swap_pattern"                                                             \
-    "(uint8_t *z, const uint8_t *x, GrB_Index i, GrB_Index j, const uint8_t *y)"\
+    "(uint8_t *z, const uint64_t *x, int64_t i, int64_t j, const uint8_t *y)"\
     "{"                                                                         \
-        "(*z) = ((i \% 2) * 2) | (*x & 1);"                                     \
+        "(*z) = ((i % 2) * 2) | (*x & 1);"                                     \
     "}"
 
 int LAGraph_SwapEdges
@@ -105,7 +104,6 @@ int LAGraph_SwapEdges
     char *msg
 )
 {
-    return (GrB_NOT_IMPLEMENTED) ;
     //--------------------------------------------------------------------------
     // Declorations
     //--------------------------------------------------------------------------
@@ -119,9 +117,7 @@ int LAGraph_SwapEdges
     // swaps x e
     // Selected pairs for next batch of swaps
     // Each row contains 2 entries for the edges involved in a swap.
-    GrB_Matrix pairs = NULL;
-    GrB_Matrix pairs_4s = NULL;
-    GrB_Matrix pairs_i = NULL;
+    GrB_Matrix pairs = NULL, pairs_4s = NULL, pairs_i = NULL;
     GrB_Matrix pairs_new = NULL;
 
     // swaps x n
@@ -185,36 +181,42 @@ int LAGraph_SwapEdges
 
     GrB_IndexUnaryOp first_bit = NULL;
     GrB_IndexUnaryOp swap_op = NULL;
+    //GrB_Type_Code type;
+    A = G->A ;
     //--------------------------------------------------------------------------
     // Check inputs TODO
     //--------------------------------------------------------------------------
-    
+    LG_ASSERT_MSG (
+        G->kind == LAGraph_ADJACENCY_UNDIRECTED,
+        LAGRAPH_INVALID_GRAPH, 
+        "G must be undirected"
+    ) ;
 
+    LG_ASSERT_MSG (G->nself_edges == 0, LAGRAPH_NO_SELF_EDGES_ALLOWED, 
+        "G->nself_edges must be zero") ;
+    /* GRB_TRY (GrB_get(A, (void*)&type, GrB_EL_TYPE_CODE)) ;
+    LG_ASSERT_MSG (type == GrB_BOOL_CODE, LAGRAPH_INVALID_GRAPH, 
+        "A must be type boolean") ; */
     //--------------------------------------------------------------------------
     // Initializations
     //--------------------------------------------------------------------------
-
-    A = G->A ;
-
-    char typename[LAGRAPH_MAX_NAME_LEN] ;
-    GrB_Type type ;
-    LG_TRY (LAGraph_Matrix_TypeName (typename, A, msg)) ;
-    LG_TRY (LAGraph_TypeFromName (&type, typename, msg)) ;
-
+    LAGRAPH_TRY(LAGraph_Random_Init(msg)) ;
+    
+    
     GRB_TRY (GrB_Matrix_nrows (&n, A)) ;
     GRB_TRY (GrB_Matrix_nvals(&nvals, A)) ;
     e = nvals / 2 ;
     GRB_TRY (GrB_Matrix_new(&E, GrB_UINT8, e, n)) ;
     GRB_TRY (GrB_Matrix_new (&E_half, GrB_UINT8, e, n)) ;
     GRB_TRY (GrB_Matrix_new (&E_t, GrB_UINT8, e, n)) ;
-    GRB_TRY (GrB_Matrix_new (&A_tril, type, n, n)) ;
+    GRB_TRY (GrB_Matrix_new (&A_tril, GrB_BOOL, n, n)) ;
      
 
     GRB_TRY (GxB_IndexUnaryOp_new (
-        &first_bit, (void *) first_bit_equals, GrB_BOOL, GrB_UINT8, GrB_UINT8,
+        &first_bit, (void *) first_bit_equals, GrB_UINT8, GrB_UINT8, GrB_BOOL,
         "first_bit", FIRST_BIT_EQ));
     GRB_TRY (GxB_IndexUnaryOp_new (
-        &swap_op, (void *) swap_type, GrB_UINT8, GrB_UINT64, GrB_UINT64,
+        &swap_op, (void *) swap_pattern, GrB_UINT8, GrB_UINT64, GrB_UINT8,
         "swap_op", SWAP_PAT));
     
     GrB_Index num_swaps = 0, num_attempts = 0; 
@@ -235,7 +237,7 @@ int LAGraph_SwapEdges
     GRB_TRY (GrB_Vector_new(&random_v, GrB_UINT64, e)) ;
     GRB_TRY (GrB_Vector_new(&r_permute, GrB_UINT64, e)) ;
     GRB_TRY (GrB_Vector_new(&r_sorted, GrB_UINT64, e)) ;
-    GRB_TRY (GrB_Vector_new (&x, GrB_INT64, n)) ;
+    GRB_TRY (GrB_Vector_new (&x, GrB_UINT8, n)) ;
     GRB_TRY (GrB_Vector_new (&r_pairs, GrB_INT64, e)) ;
 
 
@@ -246,11 +248,11 @@ int LAGraph_SwapEdges
     // QUESTION: can't I just use an unpack and use the arrays GBLAS allocated?
     LG_TRY (LAGraph_Malloc ((void**)(&row_indices), e, sizeof(GrB_Index), msg)) ;
     LG_TRY (LAGraph_Malloc ((void**)(&col_indices), e, sizeof(GrB_Index), msg)) ;
-    LG_TRY (LAGraph_Malloc ((void**)(&values), e, sizeof(type), msg)) ;
+    LG_TRY (LAGraph_Malloc ((void**)(&values), e, sizeof(bool), msg)) ;
     GRB_TRY (
-        GrB_Matrix_extractTuples (row_indices, col_indices, values, &e, A_tril)
+        GrB_Matrix_extractTuples_BOOL (row_indices, col_indices, values, &e, A_tril)
         ) ;
-    
+    printf ("Extracted\n") ;
     /* LG_TRY (LAGraph_Malloc ((void**)(&ramp), e, sizeof(GrB_Index), msg)) ;
     LG_TRY (LAGraph_Malloc ((void**)(&half_ramp), e, sizeof(GrB_Index), msg)) ;
 
@@ -266,6 +268,28 @@ int LAGraph_SwapEdges
     {
         half_ramp[i] = i / 2;
     } */
+    //Make Ramps
+    // QUESTION: I don't want to rebuild ramp every time, so do I just build one 
+    // that is too large and use as needed?
+    GRB_TRY (GrB_Vector_new(&ramp_v, GrB_UINT64, e)) ;
+    GRB_TRY (GrB_Vector_new(&hramp_v, GrB_UINT64, e)) ;
+    GRB_TRY (GrB_Vector_new(&swapVals, GrB_UINT8, e)) ;
+    GRB_TRY (GrB_Vector_assign_UINT64 (ramp_v, NULL, NULL, 0, GrB_ALL, e, NULL)) ;
+    //This gives back 1 index;
+    GRB_TRY (GrB_Vector_apply_IndexOp_UINT64 (ramp_v, NULL, NULL,
+        GrB_ROWINDEX_INT64, ramp_v, 1, NULL)) ;
+    GRB_TRY (GrB_Vector_apply_BinaryOp2nd_UINT64(
+        ramp_v, NULL, NULL, GrB_MINUS_UINT64, ramp_v, 1UL, NULL)) ;
+
+    //QUESTION: Is this correct?
+    GRB_TRY (GrB_Vector_apply_BinaryOp2nd_UINT64(
+        hramp_v, NULL, NULL, GrB_DIV_UINT64, ramp_v, 2UL, NULL)) ;
+
+    GrB_Index ramp_size;
+    GRB_TRY (GxB_Vector_unpack_Full (
+        ramp_v, (void **)&ramp, &ramp_size, &iso, NULL)) ;
+    GRB_TRY (GxB_Vector_unpack_Full (
+        hramp_v, (void **)&half_ramp, &ramp_size, &iso, NULL)) ;
 
     GrB_Scalar zero8 ;
     GrB_Scalar one8 ;
@@ -281,31 +305,19 @@ int LAGraph_SwapEdges
     // if it has to be used
     GRB_TRY (GrB_eWiseAdd (E, NULL, NULL, GrB_PLUS_UINT8, E, E_half, NULL)) ;
 
-    GRB_TRY (GrB_Vector_assign (x, NULL, NULL, 0, GrB_ALL, n, NULL)) ;
-    GRB_TRY (GrB_Vector_assign (random_v, NULL, NULL, 0, GrB_ALL, e, NULL)) ;
+    GRB_TRY (GrB_Vector_assign_UINT8 (
+        x, NULL, NULL, 0, GrB_ALL, n, NULL)) ;
+    GRB_TRY (GrB_Vector_assign_UINT64 (
+        random_v, NULL, NULL, 0, GrB_ALL, e, NULL)) ;
 
 
-    // QUESTION: I don't want to rebuild ramp every time, so do I just build one 
-    // that is too large and use as needed?
-    GRB_TRY (GrB_Vector_new(&ramp_v, GrB_UINT64, e)) ;
-    GRB_TRY (GrB_Vector_new(&hramp_v, GrB_UINT64, e)) ;
-    // TODO:
-    // GRB_TRY (GrB_Vector_new(&swapVals, GrB_UINT64, e)) ;
-    GRB_TRY (GrB_Vector_assign (ramp_v, NULL, NULL, 0, GrB_ALL, e, NULL)) ;
-    GRB_TRY (GrB_Vector_apply_IndexOp_UINT64 (ramp_v, NULL, NULL,
-        GrB_ROWINDEX_INT64, random_v, 1, NULL)) ;
-    //QUESTION: Is this correct?
-    GRB_TRY (GrB_Vector_apply_BinaryOp2nd_UINT64(
-        hramp_v, NULL, NULL, GrB_DIV_UINT64, ramp_v, 2UL, NULL)) ;
-    GRB_TRY (GxB_Vector_unpack_Full (
-        ramp_v, (void **)&ramp, NULL, NULL, NULL)) ;
-    GRB_TRY (GxB_Vector_unpack_Full (
-        hramp_v, (void **)&half_ramp, NULL, NULL, NULL)) ;
+
     
     //TODO: Change seed
     LG_TRY(
-        LAGraph_Random_Seed(random_v, 15489451345495616ul, msg));
+        LAGraph_Random_Seed(random_v, 1548945616ul, msg));
 
+    printf("Entering loop, Good Luck:\n") ;
     while(num_swaps < e * Q && num_attempts < e * Q * 5)
     {
         GRB_TRY (GrB_Matrix_new(&pairs, GrB_UINT8, swaps_per_loop, e)) ; 
@@ -323,15 +335,24 @@ int LAGraph_SwapEdges
             r_sorted, r_permute, GrB_LT_UINT64, random_v, GrB_NULL
         )) ;
         // TODO change this vect name
-        GrB_Vector_apply(r_sorted, NULL, NULL, swap_op, r_sorted, NULL) ;
+        GRB_TRY(GrB_Vector_apply_IndexOp_UINT8(swapVals, NULL, NULL, swap_op, 
+            r_sorted, (uint8_t) 0, NULL)) ;
         // NOTE: Small typo on 6.11.6. Refers to vb even though its not a bitmap
         // Also 
         // TODO: handle memory
         // TODO: try and make this more efficient maybe just rand % e rather 
         // than a permutation
+
+        GrB_Index perm_size, swap_size;
         GRB_TRY (GxB_Vector_unpack_Full(
-            r_permute, (void **)&edge_perm, NULL, NULL, NULL
+            r_permute, (void **)&edge_perm, &perm_size, &iso, NULL
         )) ;
+        uint8_t *swaps = NULL;
+        LG_ASSERT(!iso, GrB_NOT_IMPLEMENTED);
+        GRB_TRY (GxB_Vector_unpack_Full(
+            swapVals, (void **)&swaps, &swap_size, NULL, NULL
+        )) ;
+        LG_ASSERT(!iso, GrB_NOT_IMPLEMENTED);
 
 
         // Pair edges. Take a random permutation and pair adjacent values.
@@ -344,11 +365,19 @@ int LAGraph_SwapEdges
             //      vals[i] += vals[i] > vals[i-1]
         // I know it will be alot less safe but is it more efficient to pack
         // pairs as needed? Doubt it.
-        /* GRB_TRY (GrB_Matrix_build_UINT8(
-            pairs, edge_perm, half_ramp, vals, swaps_per_loop * 2, NULL
-        )) ; */
+        GRB_TRY (GrB_Matrix_build_UINT8(
+            pairs, edge_perm, half_ramp, swaps, swaps_per_loop * 2, NULL
+        ));
 
-
+        // QUESTION: do I repack just to throw away?
+        GRB_TRY (GxB_Vector_pack_Full(
+            r_permute, (void **)&edge_perm, perm_size, false, NULL
+        )) ;
+        GRB_TRY (GxB_Vector_pack_Full(
+            swapVals, (void **)&swaps, swap_size, false, NULL
+        )) ;
+        GRB_TRY (GrB_free(&r_permute));
+        GRB_TRY (GrB_free(&swapVals));
 
         // each row of M will have 4 values [0,1,2,3]
         // pairs |  E  |  M
@@ -358,7 +387,7 @@ int LAGraph_SwapEdges
         // This gives us randomization as to which type of swap is happening.
         // M = pairs * E (any_lxor)
         GRB_TRY (GrB_mxm(M, NULL, NULL, GxB_ANY_LXOR_UINT8, pairs, E, NULL)) ;
-
+        
         // remove any entries of M with less than 3 values
         // This is taken from LAGraph_Cached_OutDegree. 
         // TODO: Should there be a function that takes in A matrix and computes
@@ -368,15 +397,17 @@ int LAGraph_SwapEdges
             M, x, NULL)) ; 
 
         // Q: Do I need a new M with the correct dimension?
-        // YES TODO
+        // TODO: if full skip next steps, 
         GRB_TRY (GrB_Vector_select_UINT8(
             M_outdeg, NULL, NULL, GrB_VALUEEQ_UINT8, M_outdeg, (uint8_t) 4, NULL)) ;
 
-        // QUESTION: Can I Null size, Iso, etc? Or is that memory also my responsibility now?
-        bool iso;
+
+        GrB_Index arr_size, junk_size;
         GRB_TRY (GxB_Vector_unpack_CSC(
-            M_outdeg, &arr_keep, &junk, NULL, NULL, &iso,
+            M_outdeg, &arr_keep, &junk, &arr_size, &junk_size, &iso,
             &n_keep, NULL, NULL)) ;
+        LG_ASSERT_MSG(iso, GrB_NOT_IMPLEMENTED, "GraphBLAS unexpectedly gave me"
+            " a matrix that is not iso");
         LG_TRY (LAGraph_Free(&junk, msg));
 
         // Remove bad swaps
@@ -384,9 +415,12 @@ int LAGraph_SwapEdges
         GRB_TRY (GrB_Matrix_new(&pairs_4s, GrB_UINT8, n_keep, e)) ; 
 
         GRB_TRY (GrB_Matrix_extract(
-            M_fours, NULL, NULL, M, arr_keep, n_keep, GrB_ALL, 0, NULL)) ;
+            M_fours, NULL, NULL, M, arr_keep, arr_size, GrB_ALL, 0, NULL)) ;
         GRB_TRY (GrB_Matrix_extract(
-            pairs_4s, NULL, NULL, pairs, arr_keep, n_keep, GrB_ALL, 0, NULL)) ;
+            pairs_4s, NULL, NULL, pairs, arr_keep, arr_size, GrB_ALL, 0, NULL)) ;
+
+        //GRB_TRY (GrB_free(&M));
+        //GRB_TRY (GrB_free(&pairs)); 
 
         LG_TRY (LAGraph_Free((void **)&arr_keep, msg));
         // interf <!diagonal> = M*MT(plus_one)
@@ -400,24 +434,22 @@ int LAGraph_SwapEdges
 
         /* GRB_TRY (GrB_Matrix_reduce_Monoid(
             r_interf, NULL, NULL, GrB_MAX_MONOID_UINT8, interf, GrB_DESC_R)); */
-        GRB_TRY (GrB_Vector_select_UINT8(
-            r_interf, NULL, NULL, GrB_VALUEGE_UINT8, r_interf, 2, NULL)) ;
+        GRB_TRY (GrB_Matrix_select_UINT8(
+            interf, NULL, NULL, GrB_VALUEGE_UINT8, interf, 2, NULL)) ;
         GRB_TRY (GrB_Matrix_reduce_Monoid(
             r_interf, NULL, NULL, GxB_ANY_UINT8_MONOID, interf, GrB_DESC_R));
         
-        // TODO: Make vars to grab these null vals
         GRB_TRY (GxB_Vector_unpack_CSC(
-            r_interf, &arr_keep, &junk, NULL, NULL, NULL,
+            r_interf, &arr_keep, &junk, &arr_size, &junk_size, &iso,
             &n_keep, NULL, NULL)) ;
         LG_TRY (LAGraph_Free(&junk, msg));
 
-        //TODO: free all the vectors you don't need right after you stop using them.
         // Remove bad swaps
         GRB_TRY (GrB_Matrix_new(&M_i, GrB_UINT8, n_keep, n)) ;
         GRB_TRY (GrB_Matrix_new(&pairs_i, GrB_UINT8, n_keep, e)) ; 
         // QUESTION: is it easier to extract on transpose or extract and then remake the transpose?
         GRB_TRY (GrB_Matrix_extract(
-            M_i, NULL, NULL, M_fours, arr_keep, n_keep, GrB_ALL, 0, NULL)) ;
+            M_i, NULL, NULL, M_fours, arr_keep, arr_size, GrB_ALL, 0, NULL)) ;
         GRB_TRY (GrB_Matrix_extract(
             pairs_i, NULL, NULL, pairs_4s, arr_keep, n_keep, GrB_ALL, 0, NULL)) ;
 
@@ -428,9 +460,9 @@ int LAGraph_SwapEdges
         // M2 = select M (x & 1 == 1) / 2
         GRB_TRY (GrB_Matrix_new(&M_1, GrB_UINT8, n_keep, n)) ;
         GRB_TRY (GrB_Matrix_new(&M_2, GrB_UINT8, n_keep, n)) ;
-        GRB_TRY (GrB_Matrix_select_UINT8(
+        GRB_TRY (GrB_select(
             M_1, NULL, NULL, first_bit, M_i, 0, GrB_DESC_R)) ;
-        GRB_TRY (GrB_Matrix_select_UINT8(
+        GRB_TRY (GrB_select(
             M_2, NULL, NULL, first_bit, M_i, 1, GrB_DESC_R)) ;
         GRB_TRY (GrB_Matrix_apply_BinaryOp2nd_UINT8(
             M_1, NULL, NULL, GrB_DIV_UINT8, M_1, 2, NULL)) ;
@@ -463,41 +495,47 @@ int LAGraph_SwapEdges
         GRB_TRY (GrB_Vector_assign(
             r_exists, r_exists, NULL, NULL, GrB_ALL, 0, GrB_DESC_SC)) ;
         GRB_TRY (GxB_Vector_unpack_CSC(
-            r_exists, &arr_keep, &junk, NULL, NULL, NULL, &n_keep,
+            r_exists, &arr_keep, &junk, &arr_size, &junk_size, &iso, &n_keep,
             NULL, NULL)) ;
         LG_TRY (LAGraph_Free(&junk, msg)) ;
         GRB_TRY (GrB_Matrix_new(
             E_arranged, GrB_UINT8, e - 2 * n_keep, n)) ;
         GRB_TRY (GrB_Matrix_new(E_arranged + 1, GrB_UINT8, n_keep, n)) ;
         GRB_TRY (GrB_Matrix_new(E_arranged + 2, GrB_UINT8, n_keep, n)) ;
+
         // TODO: Check if this needs to be transposed I think it does
         GRB_TRY (GrB_Matrix_extract(E_arranged[1], NULL, NULL, M_1, GrB_ALL, n, 
-            arr_keep,  n_keep, NULL)) ;
+            arr_keep,  arr_size, NULL)) ;
         GRB_TRY (GrB_Matrix_extract(E_arranged[2], NULL, NULL, M_1, GrB_ALL, n, 
-            arr_keep, n_keep, NULL)) ;
+            arr_keep, arr_size, NULL)) ;
         GRB_TRY (GrB_Matrix_extract(pairs_new, NULL, NULL, pairs_i, GrB_ALL, n, 
-            arr_keep, n_keep, NULL)) ;
+            arr_keep, arr_size, NULL)) ;
         LG_TRY (LAGraph_Free((void **)&arr_keep, msg));
 
         GrB_Index n_old;
         GRB_TRY (GrB_Matrix_reduce_Monoid(
             r_pairs, NULL, NULL, GxB_ANY_UINT8_MONOID, pairs, GrB_DESC_RT0));
+
+        //QUESTION: Best way to make these all zero??
         GRB_TRY (GrB_Vector_assign(
             r_pairs, r_pairs, NULL, NULL, GrB_ALL, 0, GrB_DESC_SC)) ;
         GRB_TRY (GxB_Vector_unpack_CSC(
-            r_exists, &arr_keep, &junk, NULL, NULL, NULL, &n_old,
+            r_exists, &arr_keep, &junk, &arr_size, &junk_size, &iso, &n_old,
             NULL, NULL)) ;
         LG_TRY (LAGraph_Free(&junk, msg)) ;
-        // Question where do I find these error msgs
-        LG_ASSERT(n_old ==  e - 2 * n_keep, 1) ;
+        
+        LG_ASSERT(n_old ==  e - 2 * n_keep, GrB_NOT_IMPLEMENTED) ;
         GRB_TRY (GrB_Matrix_extract(E_arranged[0], NULL, NULL, E, 
-            arr_keep, n_old, GrB_ALL, n, NULL)) ;
+            arr_keep, arr_size, GrB_ALL, n, NULL)) ;
+        LG_TRY (LAGraph_Free((void **)&arr_keep, msg));
 
         // E = Concat(E_prime, M_1, M_2)
         // where E_prime contains no edges in the indegree of pairs after it is 
         // pruned
         GRB_TRY (GxB_Matrix_concat(E, E_arranged, 3, 1, NULL)) ;
+        
         // Free Matricies that have to be rebuilt
+        // TODO: free all the vectors you don't need right after you stop using them.
         GrB_free(&pairs) ; 
         GrB_free(&M) ; 
 
@@ -530,9 +568,14 @@ int LAGraph_SwapEdges
         // Maintain random Vector
         LG_TRY (LAGraph_Random_Next(random_v, msg)) ;
     } 
+    //GrB_free(&random_v);
+    //LAGraph_Free((void **)&half_ramp, msg);
+
     // QUESTION: how should the values of the matrix be assigned again?
-    GRB_TRY (GrB_select (*A_new, NULL, NULL, GrB_DIAG, A, 0, NULL)) ;
-    GRB_TRY (GrB_mxm(*A_new, NULL, NULL, NULL, E, E, GrB_DESC_T0)) ;
+    //GRB_TRY (GrB_select (*A_new, NULL, NULL, GrB_DIAG, A, 0, NULL)) ;
+    GRB_TRY(GrB_Matrix_new(A_new, GrB_UINT8, n, n)) ;
+    GRB_TRY (GrB_mxm(
+        *A_new, NULL, NULL, LAGraph_any_one_uint8, E, E, GrB_DESC_T0)) ;
 
     // GrB_PLUS_INT64 - I rather not give this a type, is that possible? 
     GRB_TRY (GrB_eWiseAdd(
