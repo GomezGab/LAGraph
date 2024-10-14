@@ -31,7 +31,7 @@ char filename [LEN+1] ;
 const char* tests [ ] =
 {
     "random_unweighted_general1.mtx",
-    //"random_unweighted_general2.mtx",
+    "random_unweighted_general2.mtx",
     //"bcsstk13.mtx",
     ""
 } ;
@@ -42,7 +42,8 @@ void test_SwapEdges (void)
     //--------------------------------------------------------------------------
     OK (LAGraph_Init (msg)) ;
     GrB_Matrix A = NULL, C = NULL, A_new = NULL, C_new = NULL;
-    LAGraph_Graph G = NULL ;
+    LAGraph_Graph G = NULL, G_new = NULL;
+    GrB_Vector deg_seq = NULL, deg_seq_new = NULL, perm = NULL, perm_new = NULL;
 
     for (int k = 0 ; ; k++)
     {
@@ -91,26 +92,51 @@ void test_SwapEdges (void)
         }
 
         // compute the row degree
+        GrB_Index n = 0;
         OK (LAGraph_Cached_OutDegree (G, msg)) ;
-
+        OK (GrB_Matrix_nrows(&n, G->A));
+        OK (GrB_Vector_new(&deg_seq, GrB_INT64, n));
+        OK (GrB_Vector_new(&deg_seq_new, GrB_INT64, n));
+        OK (GrB_Vector_new(&perm, GrB_INT64, n));
+        OK (GrB_Vector_new(&perm_new, GrB_INT64, n));
+        OK (GxB_Vector_sort (
+            deg_seq, perm, GrB_LT_INT64, G->out_degree, GrB_NULL
+        )) ;
         //----------------------------------------------------------------------
         // test the algorithm
         //----------------------------------------------------------------------
 
         printf ("No Swap Basic Test:\n") ;
-        GrB_set (GrB_GLOBAL, (int32_t) (true), GxB_BURBLE) ;
-        OK(LAGraph_SwapEdges( &A_new, G, (GrB_Index) 0, msg));
-        GrB_set (GrB_GLOBAL, (int32_t) (false), GxB_BURBLE) ;
+        //GrB_set (GrB_GLOBAL, (int32_t) (true), GxB_BURBLE) ;
+        OK(LAGraph_SwapEdges( &A_new, G, (GrB_Index) 100, msg));
+        //GrB_set (GrB_GLOBAL, (int32_t) (false), GxB_BURBLE) ;
         printf ("Test ends:\n") ;
 
         //----------------------------------------------------------------------
         // check results
         //----------------------------------------------------------------------
-        //bool isEq = false;
-        //LAGraph_Matrix_IsEqual(&isEq, C, A_new, msg);
-        OK (GrB_free (&A_new)) ;
-        //OK (GrB_free (&C_new)) ;
+        bool ok = false;
+        //Basic: make sure we got a symetric back out:
+        OK (LAGraph_New (&G_new, &A_new, LAGraph_ADJACENCY_DIRECTED, msg)) ;
+        OK (LAGraph_Cached_AT (G, msg)) ;
+        OK (LAGraph_Matrix_IsEqual (&ok, G->AT, G->A, msg)) ;
+        TEST_CHECK (ok) ;
+
+        //next: check degrees stay the same.
+        OK (LAGraph_Cached_OutDegree (G_new, msg)) ;
+        OK (GxB_Vector_sort (
+            deg_seq_new, perm_new, GrB_LT_INT64, G_new->out_degree, GrB_NULL
+        )) ;
+        GxB_Vector_fprint (deg_seq, "degree sequence", GxB_SHORT, stdout);
+        OK (LAGraph_Vector_IsEqual (&ok, deg_seq, deg_seq_new, msg)) ;
+
+
         OK (LAGraph_Delete (&G, msg)) ;
+        OK (LAGraph_Delete (&G_new, msg)) ;
+        GrB_free(&deg_seq) ;
+        GrB_free(&deg_seq_new) ;
+        GrB_free(&perm) ;
+        GrB_free(&perm_new) ;
     }
 
     //--------------------------------------------------------------------------
