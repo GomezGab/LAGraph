@@ -423,12 +423,14 @@ int LAGraph_SwapEdges
         /* GRB_TRY (GrB_Matrix_reduce_Monoid(
             r_interf, NULL, NULL, GrB_MAX_MONOID_UINT8, interf, GrB_DESC_R)); */
         GRB_TRY (GrB_Matrix_select_UINT8(
-            interf, NULL, NULL, GrB_OFFDIAG, interf, 2, NULL)) ;
+            interf, NULL, NULL, GrB_OFFDIAG, interf, 0, NULL)) ;
         GRB_TRY (GrB_Matrix_select_UINT8(
             interf, NULL, NULL, GrB_VALUEGE_UINT8, interf, 2, NULL)) ;
         GRB_TRY (GrB_Matrix_reduce_Monoid(
             r_interf, NULL, NULL, GxB_ANY_UINT8_MONOID, interf, NULL));
-        
+        GRB_TRY (GrB_Vector_assign_UINT8(
+            r_interf, r_interf, NULL, (uint8_t) 0, GrB_ALL, 0, GrB_DESC_RSC)) ;
+
         GRB_TRY (GxB_Vector_unpack_CSC(
             r_interf, &arr_keep, &junk, &arr_size, &junk_size, &iso,
             &n_keep, NULL, NULL)) ;
@@ -474,9 +476,9 @@ int LAGraph_SwapEdges
         // exists += M_2 * E (plus_one) (accum is max if theres an intersection)
         GRB_TRY (GrB_mxm(
             exists, NULL, GrB_MAX_UINT8, LAGraph_plus_one_uint8, 
-            M_1, E_t, NULL)) ;
+            M_2, E_t, NULL)) ;
         GRB_TRY (GrB_Matrix_select_UINT8(
-            exists, NULL, NULL, GrB_VALUEEQ_UINT8, exists, 2, NULL)) ;
+            exists, NULL, NULL, GrB_VALUEEQ_UINT8, exists, (uint8_t) 2, NULL)) ;
         // 2 if intended swap already exists in the matrix, 1 or noval otherwise
         GRB_TRY (GrB_Matrix_reduce_Monoid(
             r_exists, NULL, NULL, GxB_ANY_UINT8_MONOID, exists, NULL));
@@ -520,7 +522,7 @@ int LAGraph_SwapEdges
         GRB_TRY (GrB_Matrix_extract(E_arranged[0], NULL, NULL, E, 
             arr_keep, n_old, GrB_ALL, n, NULL)) ;
         LG_TRY (LAGraph_Free((void **)&arr_keep, msg));
-
+        //GxB_Matrix_fprint (E_arranged[1], "new edges", GxB_SHORT, stdout);
         // E = Concat(E_prime, M_1, M_2)
         // where E_prime contains no edges in the indegree of pairs after it is 
         // pruned
@@ -567,10 +569,11 @@ int LAGraph_SwapEdges
     GRB_TRY(GrB_Matrix_new(A_new, GrB_UINT8, n, n)) ;
     GRB_TRY (GrB_mxm(
         *A_new, NULL, NULL, LAGraph_any_one_uint8, E, E, GrB_DESC_T0)) ;
-
+    GRB_TRY(GrB_Matrix_select_UINT8(
+        *A_new, NULL, NULL, GrB_OFFDIAG, *A_new, (uint8_t) 0, NULL)) ;
     // GrB_PLUS_INT64 - I rather not give this a type, is that possible? 
-    GRB_TRY (GrB_eWiseAdd(
-        *A_new, NULL, NULL, GxB_ANY_INT64, *A_new, *A_new, GrB_DESC_T0)) ;
+    //GRB_TRY (GrB_eWiseAdd(
+    //    *A_new, NULL, NULL, GxB_ANY_UINT8, *A_new, *A_new, GrB_DESC_T0)) ;
     //TODO: give A_new values
     LG_FREE_WORK ;
     return (GrB_SUCCESS) ;

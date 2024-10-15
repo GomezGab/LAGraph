@@ -106,7 +106,6 @@ void test_SwapEdges (void)
         // test the algorithm
         //----------------------------------------------------------------------
 
-        printf ("No Swap Basic Test:\n") ;
         //GrB_set (GrB_GLOBAL, (int32_t) (true), GxB_BURBLE) ;
         OK(LAGraph_SwapEdges( &A_new, G, (GrB_Index) 100, msg));
         //GrB_set (GrB_GLOBAL, (int32_t) (false), GxB_BURBLE) ;
@@ -116,20 +115,33 @@ void test_SwapEdges (void)
         // check results
         //----------------------------------------------------------------------
         bool ok = false;
-        //Basic: make sure we got a symetric back out:
+        //Make sure we got a symetric back out:
         OK (LAGraph_New (&G_new, &A_new, LAGraph_ADJACENCY_DIRECTED, msg)) ;
-        OK (LAGraph_Cached_AT (G, msg)) ;
-        OK (LAGraph_Matrix_IsEqual (&ok, G->AT, G->A, msg)) ;
+        OK (LAGraph_Cached_AT (G_new, msg)) ;
+        OK (LAGraph_Matrix_IsEqual (&ok, G_new->AT, G_new->A, msg)) ;
         TEST_CHECK (ok) ;
 
+        //Make sure no self edges created.
+        OK (LAGraph_Cached_NSelfEdges (G_new, msg)) ;
+        TEST_CHECK (G_new->nself_edges == 0);
+
+        // Check nvals stay the same. 
+        GrB_Index edge_count, new_edge_count;
+        OK (GrB_Matrix_nvals(&edge_count, G->A)) ;
+        OK (GrB_Matrix_nvals(&new_edge_count, G_new->A)) ;
+        printf("old: %ld, new: %ld", edge_count,new_edge_count);
+        TEST_CHECK(edge_count == new_edge_count);
         //next: check degrees stay the same.
         OK (LAGraph_Cached_OutDegree (G_new, msg)) ;
         OK (GxB_Vector_sort (
             deg_seq_new, perm_new, GrB_LT_INT64, G_new->out_degree, GrB_NULL
         )) ;
-        GxB_Vector_fprint (deg_seq, "degree sequence", GxB_SHORT, stdout);
-        OK (LAGraph_Vector_IsEqual (&ok, deg_seq, deg_seq_new, msg)) ;
+        
+        //GxB_Vector_fprint (deg_seq, "degree sequence", GxB_SHORT, stdout);
+        //GxB_Vector_fprint (deg_seq_new, "new degree sequence", GxB_SHORT, stdout);
 
+        OK (LAGraph_Vector_IsEqual (&ok, deg_seq, deg_seq_new, msg)) ;
+        TEST_CHECK (ok) ;
 
         OK (LAGraph_Delete (&G, msg)) ;
         OK (LAGraph_Delete (&G_new, msg)) ;
