@@ -37,20 +37,24 @@
 #define LG_FREE_WORK                                    \
 {                                                       \
     /* free any workspace used here */                  \
-    GrB_free (&edge_degrees) ;                          \
-    GrB_free (&D) ;                                     \
-    GrB_free (&degrees) ;                               \
-    GrB_free (&node_edges) ;                            \
-    GrB_free (&edges_per_deg) ;                         \
-    GrB_free (&rcCalculation) ;                         \
+    GrB_free(&D) ;                                      \
+    GrB_free(&edge_degrees) ;                           \
+    GrB_free(&degrees) ;                                \
+    GrB_free(&node_edges) ;                             \
+    GrB_free(&edges_per_deg) ;                          \
+    GrB_free(&verts_per_deg) ;                          \
+    GrB_free(&iseq_2lt) ;                               \
+    GrB_free(&plus_2le) ;                               \
+    GrB_free(&rcCalculation) ;                          \
     LAGraph_Free((void **) &index_edge, NULL) ;         \
-    LAGraph_Free((void **) &node_edges_arr, NULL); \
+    LAGraph_Free((void **) &node_edges_arr, NULL);  \
     LAGraph_Free((void **) &deg_arr, NULL);             \
     LAGraph_Free((void **) &edges_per_deg_arr, NULL);   \
     LAGraph_Free((void **) &cumul_array, NULL);         \
     LAGraph_Free((void **) &ones, NULL);                \
     LAGraph_Free((void **) &deg_vertex_count, NULL);    \
 }
+
 
 #define LG_FREE_ALL                         \
 {                                           \
@@ -253,16 +257,13 @@ int LAGraph_RichClubCoefficient
         node_edges, &index_edge, (void **) &node_edges_arr,
         &vi_size,&vx_size,&iso,&edge_vec_nvals, NULL, NULL)) ;
     LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
-    //QUESTION: better way to adjust degrees over by one?
 
     GRB_TRY(GrB_assign (degrees, degrees, GrB_MINUS_UINT64, 1, GrB_ALL, 0, GrB_DESC_S));
     GRB_TRY(GxB_Vector_unpack_CSC(
         degrees, &index_edge, (void **) &deg_arr,
         &vi_size,&vx_size,&iso,&deg_vec_size, NULL, NULL)) ; 
-
     LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
    
-
     // TODO change what this throws
     LG_ASSERT (edge_vec_nvals == deg_vec_size, GrB_NULL_POINTER) ;
 

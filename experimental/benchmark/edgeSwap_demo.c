@@ -62,9 +62,9 @@ int main (int argc, char **argv)
         &G,         // the graph that is read from stdin or a file
         NULL,       // source nodes (none, if NULL)
         true,      // make the graph undirected, if true
-        false,      // remove self-edges, if true
-        false,      // return G->A as structural, if true,
-        NULL,       // prefered GrB_Type of G->A; null if no preference
+        true,      // remove self-edges, if true
+        true,      // return G->A as structural, if true,
+        GrB_BOOL,       // prefered GrB_Type of G->A; null if no preference
         false,      // ensure all entries are positive, if true
         argc, argv)) ;  // input to this main program
     t = LAGraph_WallClockTime ( ) - t ;
@@ -74,31 +74,23 @@ int main (int argc, char **argv)
     LG_TRY (LAGraph_Graph_Print (G, LAGraph_SHORT, stdout, msg)) ;
 
     //--------------------------------------------------------------------------
-    // try the LAGraph_HelloWorld "algorithm"
+    // try the LAGraph_EdgeSwap algorithm
     //--------------------------------------------------------------------------
 
+    LG_TRY (LAGraph_Cached_OutDegree (G, msg)) ;
     t = LAGraph_WallClockTime ( ) ;
-    LG_TRY (LAGraph_HelloWorld (&Y, G, msg)) ;
+    LG_TRY (LAGraph_SwapEdges (&Y, G, (GrB_Index) 100, msg)) ;
     t = LAGraph_WallClockTime ( ) - t ;
     printf ("Time for LAGraph_HelloWorld: %g sec\n", t) ;
-
+    
     //--------------------------------------------------------------------------
     // check the results (make sure Y is a copy of G->A)
     //--------------------------------------------------------------------------
 
-    bool isequal ;
     t = LAGraph_WallClockTime ( ) ;
-    LG_TRY (LAGraph_Matrix_IsEqual (&isequal, Y, G->A, msg)) ;
+    //TODO
     t = LAGraph_WallClockTime ( ) - t ;
     printf ("Time to check results:       %g sec\n", t) ;
-    if (isequal)
-    {
-        printf ("Test passed.\n") ;
-    }
-    else
-    {
-        printf ("Test failure!\n") ;
-    }
 
     //--------------------------------------------------------------------------
     // print the results (Y is just a copy of G->A)

@@ -43,7 +43,7 @@ void test_SwapEdges (void)
     OK (LAGraph_Init (msg)) ;
     GrB_Matrix A = NULL, C = NULL, A_new = NULL, C_new = NULL;
     LAGraph_Graph G = NULL, G_new = NULL;
-    GrB_Vector deg_seq = NULL, deg_seq_new = NULL, perm = NULL, perm_new = NULL;
+    GrB_Vector deg_seq = NULL, deg_seq_new = NULL;
 
     for (int k = 0 ; ; k++)
     {
@@ -97,10 +97,8 @@ void test_SwapEdges (void)
         OK (GrB_Matrix_nrows(&n, G->A));
         OK (GrB_Vector_new(&deg_seq, GrB_INT64, n));
         OK (GrB_Vector_new(&deg_seq_new, GrB_INT64, n));
-        OK (GrB_Vector_new(&perm, GrB_INT64, n));
-        OK (GrB_Vector_new(&perm_new, GrB_INT64, n));
         OK (GxB_Vector_sort (
-            deg_seq, perm, GrB_LT_INT64, G->out_degree, GrB_NULL
+            deg_seq, NULL, GrB_LT_INT64, G->out_degree, GrB_NULL
         )) ;
         //----------------------------------------------------------------------
         // test the algorithm
@@ -134,7 +132,7 @@ void test_SwapEdges (void)
         //next: check degrees stay the same.
         OK (LAGraph_Cached_OutDegree (G_new, msg)) ;
         OK (GxB_Vector_sort (
-            deg_seq_new, perm_new, GrB_LT_INT64, G_new->out_degree, GrB_NULL
+            deg_seq_new, NULL, GrB_LT_INT64, G_new->out_degree, GrB_NULL
         )) ;
         
         //GxB_Vector_fprint (deg_seq, "degree sequence", GxB_SHORT, stdout);
@@ -147,8 +145,6 @@ void test_SwapEdges (void)
         OK (LAGraph_Delete (&G_new, msg)) ;
         GrB_free(&deg_seq) ;
         GrB_free(&deg_seq_new) ;
-        GrB_free(&perm) ;
-        GrB_free(&perm_new) ;
     }
 
     //--------------------------------------------------------------------------
