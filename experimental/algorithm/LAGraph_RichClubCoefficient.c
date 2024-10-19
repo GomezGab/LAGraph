@@ -214,9 +214,10 @@ int LAGraph_RichClubCoefficient
     GRB_TRY (GrB_mxm(
         edge_degrees, NULL, NULL, GxB_ANY_FIRST_UINT64,D,A, NULL)) ;
 
+    GRB_TRY (GrB_transpose(edge_degrees, NULL, NULL, edge_degrees, NULL)) ;
     // QUESTION: Is it not more efficient to simply use min here and then count up?
     GRB_TRY(GrB_mxm(
-        edge_degrees, NULL, NULL, plus_2le, edge_degrees, D, GrB_NULL)) ;
+        edge_degrees, NULL, NULL, plus_2le, D, edge_degrees, NULL)) ;
 
     // If the nodes of an edge have different degrees, the edge is counted once.
     // If they have the same degree, that edge is double counted. So, we adjust:
@@ -226,46 +227,35 @@ int LAGraph_RichClubCoefficient
     // The rest of this is indexing the number of edges and number of nodes at 
     // each degree and then doing a cummulative sum to know the amount of edges 
     // and nodes at degree geq k.
-    GRB_TRY(GrB_Vector_nvals (&edge_vec_nvals, node_edges));
-    vi_size = (edge_vec_nvals+1)*sizeof(GrB_Index);
-    vx_size = (edge_vec_nvals+1)*sizeof(GrB_UINT64);
-/* 
-    // Grab the index and edge count arrays from GBLASn with a bitmap incase
-    // there are empties 
-    //QUESTION: is it worth it to just fill these vectors?
-    GRB_TRY(GxB_Vector_unpack_Bitmap(
-        node_edges, &index_edge, (void **) &node_edges_arr,
-        &vi_size,&vx_size,&iso,&edge_vec_nvals, GrB_NULL)) ;
-    LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
+    GRB_TRY(GrB_Vector_nvals (&edge_vec_nvals, node_edges)) ;
 
-    //QUESTION: iso edge case
-    LG_ASSERT (!iso, GrB_NOT_IMPLEMENTED) ;
+    GRB_TRY(GrB_assign (
+        degrees, degrees, GrB_MINUS_UINT64, 1, GrB_ALL, 0, GrB_DESC_S));
 
-
-    GRB_TRY(GxB_Vector_unpack_Bitmap(
-        degrees, &index_edge, (void **) &deg_arr,
-        &vi_size,&vx_size,&iso,&deg_vec_size, GrB_NULL)) ; 
-    LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
-    LG_ASSERT (!iso, GrB_NOT_IMPLEMENTED) ;
- */
-    //CSC unpack QUESTION
     // Grab the index and edge count arrays from GBLAS
     // Jumbled NULL so must return sorted. Needed because arrays with 
     // # of edges and # of degrees should line up.
+    if(n == edge_vec_nvals)
+    {
+        GRB_TRY (GxB_Vector_unpack_Full (
+            node_edges, (void **)&node_edges_arr, &vx_size, &iso, NULL)) ;
+        GRB_TRY (GxB_Vector_unpack_Full (
+            degrees, (void **)&deg_arr, &vx_size, &iso, NULL)) ;
 
-     GRB_TRY(GxB_Vector_unpack_CSC(
-        node_edges, &index_edge, (void **) &node_edges_arr,
-        &vi_size,&vx_size,&iso,&edge_vec_nvals, NULL, NULL)) ;
-    LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
+        deg_vec_size = n;
+    }
+    else
+    {
+        GRB_TRY(GxB_Vector_unpack_CSC(
+            node_edges, &index_edge, (void **) &node_edges_arr,
+            &vi_size,&vx_size,&iso,&edge_vec_nvals, NULL, NULL)) ;
+        LG_TRY(LAGraph_Free((void **)&index_edge, msg)) ;
 
-    GRB_TRY(GrB_assign (degrees, degrees, GrB_MINUS_UINT64, 1, GrB_ALL, 0, GrB_DESC_S));
-    GRB_TRY(GxB_Vector_unpack_CSC(
-        degrees, &index_edge, (void **) &deg_arr,
-        &vi_size,&vx_size,&iso,&deg_vec_size, NULL, NULL)) ; 
-    LG_TRY(LAGraph_Free((void **)&index_edge, NULL)) ;
-   
-    // TODO change what this throws
-    LG_ASSERT (edge_vec_nvals == deg_vec_size, GrB_NULL_POINTER) ;
+        GRB_TRY(GxB_Vector_unpack_CSC(
+            degrees, &index_edge, (void **) &deg_arr,
+            &vi_size,&vx_size,&iso,&deg_vec_size, NULL, NULL)) ; 
+        LG_TRY(LAGraph_Free((void **)&index_edge, msg)) ;
+    }
 
     // Build with degrees as indecies and handle duplicates via adition
     GRB_TRY(GrB_Vector_build (

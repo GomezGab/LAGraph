@@ -44,7 +44,7 @@ int main (int argc, char **argv)
     GrB_Matrix Y = NULL ;
 
     // start GraphBLAS and LAGraph
-    bool burble = false ;               // set true for diagnostic outputs
+    bool burble = true ;               // set true for diagnostic outputs
     demo_init (burble) ;
     LAGRAPH_TRY (LAGraph_Random_Init (msg)) ;
 
@@ -78,10 +78,11 @@ int main (int argc, char **argv)
     //--------------------------------------------------------------------------
 
     LG_TRY (LAGraph_Cached_OutDegree (G, msg)) ;
+    printf("Time To Swap #################################################") ;
     t = LAGraph_WallClockTime ( ) ;
-    LG_TRY (LAGraph_SwapEdges (&Y, G, (GrB_Index) 100, msg)) ;
+    LG_TRY (LAGraph_SwapEdges (&Y, G, (GrB_Index) 10, msg)) ;
     t = LAGraph_WallClockTime ( ) - t ;
-    printf ("Time for LAGraph_HelloWorld: %g sec\n", t) ;
+    printf ("Time for LAGraph_SwapEdges:  %g sec\n", t) ;
     
     //--------------------------------------------------------------------------
     // check the results (make sure Y is a copy of G->A)

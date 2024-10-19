@@ -27,10 +27,11 @@
     GrB_free (&pairs_i) ;                       \
     GrB_free (&M_1) ;                           \
     GrB_free (&M_2) ;                           \
-    GrB_free (&exists) ;                        \
+    GrB_free (&exists_1) ;                      \
+    GrB_free (&exists_2) ;                      \
     GrB_free (E_arranged) ;                     \
-    GrB_free (&E_arranged[1]) ;                 \
-    GrB_free (&E_arranged[2]) ;                 \
+    GrB_free (E_arranged + 1) ;                 \
+    GrB_free (E_arranged + 2) ;                 \
     GrB_free (&pairs_new) ;                     \
     GrB_free (&M_outdeg) ;                      \
     GrB_free (&r_interf) ;                      \
@@ -147,7 +148,7 @@ int LAGraph_SwapEdges
     GrB_Matrix M_2 = NULL; // M_1 + M_2 = M
 
     // Has a 2 in a certain row if the planned swap already exists in the matrix
-    GrB_Matrix exists = NULL;
+    GrB_Matrix exists_1 = NULL, exists_2 = NULL;
 
     GrB_Index n, e, nvals;
 
@@ -428,13 +429,20 @@ int LAGraph_SwapEdges
         GRB_TRY (GrB_transpose(M_t, NULL, NULL, M_fours, NULL)) ;
 
         GRB_TRY(GrB_Matrix_new(&interf, GrB_UINT8, n_keep, n_keep)) ;
-        GRB_TRY(GrB_Vector_new(&r_interf, GrB_UINT8, n_keep));
+        GRB_TRY(GrB_Vector_new(&r_interf, GrB_UINT8, n_keep)) ;
+
+        //Scuffed way to deal with diagonal. TODO.
+        // GRB_TRY(GrB_Vector_assign_UINT8(r_interf, NULL, NULL, (uint8_t) 0, 
+        //     GrB_ALL, 0, NULL));
+        // GRB_TRY(GrB_Matrix_diag(&interf, r_interf, 0));
+
+
         GRB_TRY (GrB_mxm(
             interf, NULL, NULL, LAGraph_plus_one_uint8, M_fours, M_t, NULL)) ;
-
-        // QUESTION: Reduce on max then select? or select then reduce on any?
+        // QUESTION: This select is taking forever. 
+        // Can I do this with a mask instead??
         GRB_TRY (GrB_Matrix_select_UINT8(
-            interf, NULL, NULL, GrB_OFFDIAG, interf, 0, NULL)) ;
+             interf, NULL, NULL, GrB_OFFDIAG, interf, 0, NULL)) ;
         /*     
         GRB_TRY (GrB_Matrix_select_UINT8(
             interf, NULL, NULL, GrB_VALUEGE_UINT8, interf, 2, NULL)) ;
@@ -478,8 +486,6 @@ int LAGraph_SwapEdges
         }
         //TODO decide if M_T is still useful
 
-       
-
         // M_1 has 2 and 0 M_2 has 1 and 3. Divide by 2 to get 0 and 1 on both.
         // M1 = select M (x & 1 == 0) / 2
         // M2 = select M (x & 1 == 1) / 2
@@ -499,20 +505,27 @@ int LAGraph_SwapEdges
         // row of E, the value of that entry in the exists array will be 2. 
         // Otherwise, 1 or noval.
         // exists = M_1 * E (plus_one)
-        GRB_TRY (GrB_Matrix_new (&exists, GrB_UINT8, n_keep, e)) ; 
+        GRB_TRY (GrB_Matrix_new (&exists_1, GrB_UINT8, n_keep, e)) ; 
+        GRB_TRY (GrB_Matrix_new (&exists_2, GrB_UINT8, n_keep, e)) ; 
         GRB_TRY (GrB_Vector_new (&r_exists, GrB_UINT8, n_keep)) ; 
         GRB_TRY (GrB_transpose(E_t, NULL, NULL, E, GrB_DESC_R)) ;
         GRB_TRY (GrB_mxm(
-            exists, NULL, NULL, LAGraph_plus_one_uint8, M_1, E_t, NULL)) ;
+            exists_1, NULL, NULL, LAGraph_plus_one_uint8, M_1, E_t, NULL)) ;
         // exists += M_2 * E (plus_one) (accum is max if theres an intersection)
         GRB_TRY (GrB_mxm(
-            exists, NULL, GrB_MAX_UINT8, LAGraph_plus_one_uint8, 
-            M_2, E_t, NULL)) ;
-        GRB_TRY (GrB_Matrix_select_UINT8(
-            exists, NULL, NULL, GrB_VALUEEQ_UINT8, exists, (uint8_t) 2, NULL)) ;
+            exists_2, NULL, NULL, LAGraph_plus_one_uint8, M_2, E_t, NULL)) ;
+        //GRB_TRY (GrB_Matrix_select_UINT8(
+        //    exists, NULL, NULL, GrB_VALUEEQ_UINT8, exists, (uint8_t) 2, NULL)) ;
         // 2 if intended swap already exists in the matrix, 1 or noval otherwise
         GRB_TRY (GrB_Matrix_reduce_Monoid(
-            r_exists, NULL, NULL, GxB_ANY_UINT8_MONOID, exists, NULL));
+            r_exists, NULL, NULL, GrB_MAX_MONOID_UINT8, exists_1, NULL));
+        GRB_TRY (GrB_Matrix_reduce_Monoid(
+            r_exists, NULL, GrB_MAX_UINT8, GrB_MAX_MONOID_UINT8, 
+            exists_2, NULL));
+        GRB_TRY (GrB_Vector_select_UINT8(
+            r_exists, NULL, NULL, GrB_VALUEEQ_UINT8, r_exists, (uint8_t) 2, NULL
+            )) ;
+
         GRB_TRY (GrB_Vector_nvals(&badcount, r_exists)) ;
         if(badcount == 0)
         {
@@ -564,7 +577,8 @@ int LAGraph_SwapEdges
         GRB_TRY (GrB_Matrix_extract(E_arranged[0], NULL, NULL, E, 
             arr_keep, n_old, GrB_ALL, n, NULL)) ;
         LG_TRY (LAGraph_Free((void **)&arr_keep, msg));
-        //GxB_Matrix_fprint (E_arranged[1], "new edges", GxB_SHORT, stdout);
+
+        
         // E = Concat(E_prime, M_1, M_2)
         // where E_prime contains no edges in the indegree of pairs after it is 
         // pruned
@@ -580,7 +594,7 @@ int LAGraph_SwapEdges
         swaps_per_loop = LAGRAPH_MIN(swaps_per_loop, e / 3) ;
         // Maintain random Vector
         LG_TRY (LAGraph_Random_Next(random_v, msg)) ;
-        //printf("Successful loop. Made %ld swaps. Total %ld out of %ld. Attempting %ld.\n\n", n_keep, num_swaps, e * Q, swaps_per_loop);
+        printf("#####Made %ld swaps. Total %ld out of %ld. Attempting %ld swaps next.#####\n\n", n_keep, num_swaps, e * Q, swaps_per_loop);
     } 
 
     GRB_TRY(GrB_Matrix_new(A_new, GrB_UINT8, n, n)) ;
