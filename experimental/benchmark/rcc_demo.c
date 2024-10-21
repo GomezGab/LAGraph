@@ -78,10 +78,11 @@ int main (int argc, char **argv)
     //--------------------------------------------------------------------------
 
     LG_TRY (LAGraph_Cached_OutDegree (G, msg)) ;
+    printf ("\n========================== Calculate RCC:\n") ;
     t = LAGraph_WallClockTime ( ) ;
     LG_TRY (LAGraph_RichClubCoefficient (&Y, G, msg)) ;
     t = LAGraph_WallClockTime ( ) - t ;
-    printf ("Time for LAGraph_HelloWorld: %g sec\n", t) ;
+    printf ("Time for LAGraph_RichClubCoefficient: %g sec\n", t) ;
     
     //--------------------------------------------------------------------------
     // check the results (make sure Y is a copy of G->A)
@@ -89,6 +90,7 @@ int main (int argc, char **argv)
 
     t = LAGraph_WallClockTime ( ) ;
     //TODO
+    
     t = LAGraph_WallClockTime ( ) - t ;
     printf ("Time to check results:       %g sec\n", t) ;
 
