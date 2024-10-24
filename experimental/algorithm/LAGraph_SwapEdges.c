@@ -36,6 +36,7 @@
     GrB_free (&M_outdeg) ;                      \
     GrB_free (&r_interf) ;                      \
     GrB_free (&r_exists) ;                      \
+    GrB_free (&new_edges) ;                     \
 }
 
 #define LG_FREE_WORK                            \
@@ -155,6 +156,12 @@ int LAGraph_SwapEdges
     // Copied vars from LAGraph_Incidence_Matrix
     GrB_Matrix E_half = NULL ;
     GrB_Matrix A_tril = NULL ;
+
+    // concat [M_1,M_2]
+    GrB_Matrix new_edges = NULL;
+
+    // [a,b] = r_interf
+    GrB_Vector r_interf_arr[2] = {NULL,NULL};
 
     // random vector 
     GrB_Vector random_v = NULL, r_permute = NULL, r_sorted = NULL;
@@ -430,65 +437,57 @@ int LAGraph_SwapEdges
         // M2 = select M (x & 1 == 1) / 2
         GRB_TRY (GrB_Matrix_new(&M_1, GrB_UINT8, n_keep, n)) ;
         GRB_TRY (GrB_Matrix_new(&M_2, GrB_UINT8, n_keep, n)) ;
+        GRB_TRY (GrB_Matrix_new(&new_edges, GrB_UINT8, 2*n_keep, n)) ;
+        // LG_TRY (LAGraph_Matrix_Print (M_i, LAGraph_SHORT, stdout, msg)) ;
         GRB_TRY (GrB_select(
             M_1, NULL, NULL, first_bit, M_i, 0, NULL)) ;
+        // LG_TRY (LAGraph_Matrix_Print (M_1, LAGraph_SHORT, stdout, msg)) ;
         GRB_TRY (GrB_select(
             M_2, NULL, NULL, first_bit, M_i, 1, NULL)) ;
+        GrB_Matrix M_long[2] = {M_1,M_2};
+
         GRB_TRY (GrB_Matrix_apply_BinaryOp2nd_UINT8(
             M_1, NULL, NULL, GrB_DIV_UINT8, M_1, 2, NULL)) ;
         GRB_TRY (GrB_Matrix_apply_BinaryOp2nd_UINT8(
             M_2, NULL, NULL, GrB_DIV_UINT8, M_2, 2, NULL)) ;
+        GRB_TRY (GxB_Matrix_concat(new_edges, M_long, 2, 1, NULL)) ;
 
+        // LG_TRY (LAGraph_Matrix_Print (new_edges, LAGraph_SHORT, stdout, msg)) ;
         // Check if an edge already exists in the graph.
         // If a row of M1 or M2 has more than 1 vertex in common with a 
         // row of E, the value of that entry in the exists array will be 2. 
         // Otherwise, 1 or noval.
         // exists = M_1 * E (plus_one)
-        GRB_TRY (GrB_Matrix_new (&exists_1, GrB_UINT8, n_keep, e)) ; 
-        GRB_TRY (GrB_Matrix_new (&exists_2, GrB_UINT8, n_keep, e)) ; 
+        GRB_TRY (GrB_Matrix_new (&exists_1, GrB_UINT8, 2 * n_keep, e)) ; 
+        GRB_TRY (GrB_Matrix_new (&exists_2, GrB_UINT8, 2 * n_keep, e)) ; 
         //GRB_TRY (GrB_Vector_new (&r_exists, GrB_UINT8, n_keep)) ; 
-        GRB_TRY (GrB_Matrix_new(&interf, GrB_UINT8, n_keep, n_keep));
-        GRB_TRY (GrB_Vector_new(&r_interf, GrB_UINT8, n_keep)) ; 
+        GRB_TRY (GrB_Matrix_new(&interf, GrB_UINT8, 2 * n_keep, 2 * n_keep));
+        GRB_TRY (GrB_Vector_new(&r_interf, GrB_UINT8, 2 * n_keep)) ; 
         GRB_TRY (GrB_transpose(E_t, NULL, NULL, E, GrB_DESC_R)) ;
 
         //Check if edges were anywhere in old graph:
         GRB_TRY (GrB_mxm(
-            exists_1, NULL, NULL, LAGraph_plus_one_uint8, M_1, E_t, NULL)) ;
-        GRB_TRY (GrB_mxm(
-            exists_2, NULL, NULL, LAGraph_plus_one_uint8, M_2, E_t, NULL)) ;
+            exists_1, NULL, NULL, LAGraph_plus_one_uint8, new_edges, E_t, NULL)) ;
 
         GRB_TRY (GrB_mxm(
-            interf, NULL, NULL, LAGraph_plus_one_uint8, M_1, M_1, GrB_DESC_T1
-        )) ;
-        GRB_TRY (GrB_mxm(
-            interf, NULL, GrB_MAX_UINT8, LAGraph_plus_one_uint8, M_2, M_2, GrB_DESC_T1
+            interf, NULL, NULL, LAGraph_plus_one_uint8, new_edges, new_edges, GrB_DESC_T1
         )) ;
         GRB_TRY (GrB_Matrix_select_UINT8(
             interf, NULL, NULL, GrB_OFFDIAG, interf, 0, NULL)) ;
-        GRB_TRY (GrB_mxm(
-            interf, NULL, GrB_MAX_UINT8, LAGraph_plus_one_uint8, M_1, M_2, GrB_DESC_T1
-        )) ;
-        GRB_TRY (GrB_mxm(
-            interf, NULL, GrB_MAX_UINT8, LAGraph_plus_one_uint8, M_2, M_1, GrB_DESC_T1
-        )) ;
         GRB_TRY (GrB_Matrix_reduce_Monoid(
             r_interf, NULL, NULL, GrB_MAX_MONOID_UINT8, 
             interf, NULL));
-        r_exists = r_interf;
         //GRB_TRY (GrB_Matrix_select_UINT8(
         //    exists, NULL, NULL, GrB_VALUEEQ_UINT8, exists, (uint8_t) 2, NULL)) ;
         // 2 if intended swap already exists in the matrix, 1 or noval otherwise
         GRB_TRY (GrB_Matrix_reduce_Monoid(
-            r_exists, NULL, GrB_MAX_UINT8, GrB_MAX_MONOID_UINT8, 
+            r_interf, NULL, GrB_MAX_UINT8, GrB_MAX_MONOID_UINT8, 
             exists_1, NULL));
-        GRB_TRY (GrB_Matrix_reduce_Monoid(
-            r_exists, NULL, GrB_MAX_UINT8, GrB_MAX_MONOID_UINT8, 
-            exists_2, NULL));
         GRB_TRY (GrB_Vector_select_UINT8(
-            r_exists, NULL, NULL, GrB_VALUEEQ_UINT8, r_exists, (uint8_t) 2, NULL
+            r_interf, NULL, NULL, GrB_VALUEEQ_UINT8, r_interf, (uint8_t) 2, NULL
             )) ;
         GrB_Index badcount;
-        GRB_TRY (GrB_Vector_nvals(&badcount, r_exists)) ;
+        GRB_TRY (GrB_Vector_nvals(&badcount, r_interf)) ;
         if(badcount == 0)
         {
             E_arranged[1] = M_1;
@@ -497,6 +496,19 @@ int LAGraph_SwapEdges
         }
         else
         {
+            GRB_TRY (GrB_Vector_new(r_interf_arr, GrB_UINT8, n_keep)) ;
+            GRB_TRY (GrB_Vector_new(r_interf_arr + 1, GrB_UINT8, n_keep)) ;
+            GRB_TRY (GrB_Vector_new(&r_exists, GrB_UINT8, n_keep)) ;
+
+            GrB_Index rows[2] = {n_keep,n_keep};
+            GrB_Index cols[1] = {1};
+            GRB_TRY(GxB_Matrix_split((GrB_Matrix *)r_interf_arr, 2, 1, rows, 
+                cols, (GrB_Matrix) r_interf, NULL));
+            GRB_TRY(GrB_eWiseAdd(r_exists, NULL, NULL, GxB_ANY_UINT8_MONOID, 
+                r_interf_arr[0], r_interf_arr[1], NULL));
+
+            LG_TRY (LAGraph_Vector_Print (r_exists, LAGraph_SHORT, stdout, msg)) ;
+            
             // Get compliment vector
             GRB_TRY (GrB_Vector_assign_UINT8(
                 r_exists, r_exists, NULL, (uint8_t) 0, GrB_ALL, 0, GrB_DESC_RSC)) ;

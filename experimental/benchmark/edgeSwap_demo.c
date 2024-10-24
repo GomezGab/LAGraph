@@ -30,6 +30,7 @@
 {                                               \
     GrB_free (&Y) ;                             \
     LAGraph_Delete (&G, msg) ;                  \
+    LAGraph_Delete (&G_new, msg) ;              \
 }
 
 int main (int argc, char **argv)
@@ -40,7 +41,7 @@ int main (int argc, char **argv)
     //--------------------------------------------------------------------------
 
     char msg [LAGRAPH_MSG_LEN] ;        // for error messages from LAGraph
-    LAGraph_Graph G = NULL ;
+    LAGraph_Graph G = NULL, G_new = NULL;
     GrB_Matrix Y = NULL ;
 
     // start GraphBLAS and LAGraph
@@ -89,7 +90,11 @@ int main (int argc, char **argv)
     //--------------------------------------------------------------------------
 
     t = LAGraph_WallClockTime ( ) ;
-    //TODO
+    bool result = false;
+    LG_TRY(LAGraph_New(&G_new, &Y, LAGraph_ADJACENCY_UNDIRECTED, msg));
+    LG_TRY (LAGraph_Cached_OutDegree (G_new, msg)) ;
+    LG_TRY (LAGraph_Vector_IsEqual(
+        &result, G->out_degree, G_new->out_degree, msg)) ;
     t = LAGraph_WallClockTime ( ) - t ;
     printf ("Time to check results:       %g sec\n", t) ;
 
