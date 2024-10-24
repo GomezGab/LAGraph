@@ -423,69 +423,8 @@ int LAGraph_SwapEdges
             GRB_TRY (GrB_free(&pairs)); 
             LG_TRY (LAGraph_Free((void **)&arr_keep, msg));
         }
-
-        // interf <!diagonal> = M*MT(plus_one)
-        GRB_TRY (GrB_Matrix_new(&M_t, GrB_UINT8, n, n_keep)) ; 
-        GRB_TRY (GrB_transpose(M_t, NULL, NULL, M_fours, NULL)) ;
-
-        GRB_TRY(GrB_Matrix_new(&interf, GrB_UINT8, n_keep, n_keep)) ;
-        GRB_TRY(GrB_Vector_new(&r_interf, GrB_UINT8, n_keep)) ;
-
-        //Scuffed way to deal with diagonal. TODO.
-        // GRB_TRY(GrB_Vector_assign_UINT8(r_interf, NULL, NULL, (uint8_t) 0, 
-        //     GrB_ALL, 0, NULL));
-        // GRB_TRY(GrB_Matrix_diag(&interf, r_interf, 0));
-
-
-        GRB_TRY (GrB_mxm(
-            interf, NULL, NULL, LAGraph_plus_one_uint8, M_fours, M_t, NULL)) ;
-        // QUESTION: This select is taking forever. 
-        // Can I do this with a mask instead??
-        GRB_TRY (GrB_Matrix_select_UINT8(
-             interf, NULL, NULL, GrB_OFFDIAG, interf, 0, NULL)) ;
-        /*     
-        GRB_TRY (GrB_Matrix_select_UINT8(
-            interf, NULL, NULL, GrB_VALUEGE_UINT8, interf, 2, NULL)) ;
-        GRB_TRY (GrB_Matrix_reduce_Monoid(
-            r_interf, NULL, NULL, GxB_ANY_UINT8_MONOID, interf, NULL)); 
-        */
-        GRB_TRY (GrB_Matrix_reduce_Monoid(
-            r_interf, NULL, NULL, GrB_MAX_MONOID_UINT8, interf, GrB_DESC_R));
-
-        GRB_TRY (GrB_Vector_select_UINT8(
-            r_interf, NULL, NULL, GrB_VALUEGE_UINT8, r_interf, 2, NULL)) ;
-        GrB_Index badcount;
-        GRB_TRY (GrB_Vector_nvals(&badcount, r_interf)) ;
-        if(badcount == 0)
-        {
-            M_i = M_fours;
-            pairs_i = pairs_4s;
-        }
-        else //delete any interf
-        {
-            GRB_TRY (GrB_Vector_assign_UINT8(
-                r_interf, r_interf, NULL, (uint8_t) 0, GrB_ALL, 0, GrB_DESC_RSC
-            )) ;
-
-            GRB_TRY (GxB_Vector_unpack_CSC(
-                r_interf, &arr_keep, &junk, &arr_size, &junk_size, &iso,
-                &n_keep, NULL, NULL)) ;
-            LG_TRY (LAGraph_Free(&junk, msg));
-
-            // Remove bad swaps
-            GRB_TRY (GrB_Matrix_new(&M_i, GrB_UINT8, n_keep, n)) ;
-            GRB_TRY (GrB_Matrix_new(&pairs_i, GrB_UINT8, n_keep, e)) ; 
-            // QUESTION: is it easier to extract on transpose or extract and then remake the transpose?
-            GRB_TRY (GrB_Matrix_extract(
-                M_i, NULL, NULL, M_fours, arr_keep, n_keep, GrB_ALL, 0, NULL)) ;
-            GRB_TRY (GrB_Matrix_extract(
-                pairs_i, NULL, NULL, pairs_4s, arr_keep, n_keep, GrB_ALL, 0, NULL
-            )) ;
-            LG_TRY (LAGraph_Free((void **)&arr_keep, msg)) ;
-            GRB_TRY(GrB_free(&M_fours));
-        }
-        //TODO decide if M_T is still useful
-
+        M_i = M_fours;
+        pairs_i = pairs_4s;
         // M_1 has 2 and 0 M_2 has 1 and 3. Divide by 2 to get 0 and 1 on both.
         // M1 = select M (x & 1 == 0) / 2
         // M2 = select M (x & 1 == 1) / 2
@@ -507,25 +446,48 @@ int LAGraph_SwapEdges
         // exists = M_1 * E (plus_one)
         GRB_TRY (GrB_Matrix_new (&exists_1, GrB_UINT8, n_keep, e)) ; 
         GRB_TRY (GrB_Matrix_new (&exists_2, GrB_UINT8, n_keep, e)) ; 
-        GRB_TRY (GrB_Vector_new (&r_exists, GrB_UINT8, n_keep)) ; 
+        //GRB_TRY (GrB_Vector_new (&r_exists, GrB_UINT8, n_keep)) ; 
+        GRB_TRY (GrB_Matrix_new(&interf, GrB_UINT8, n_keep, n_keep));
+        GRB_TRY (GrB_Vector_new(&r_interf, GrB_UINT8, n_keep)) ; 
         GRB_TRY (GrB_transpose(E_t, NULL, NULL, E, GrB_DESC_R)) ;
+
+        //Check if edges were anywhere in old graph:
         GRB_TRY (GrB_mxm(
             exists_1, NULL, NULL, LAGraph_plus_one_uint8, M_1, E_t, NULL)) ;
-        // exists += M_2 * E (plus_one) (accum is max if theres an intersection)
         GRB_TRY (GrB_mxm(
             exists_2, NULL, NULL, LAGraph_plus_one_uint8, M_2, E_t, NULL)) ;
+
+        GRB_TRY (GrB_mxm(
+            interf, NULL, NULL, LAGraph_plus_one_uint8, M_1, M_1, GrB_DESC_T1
+        )) ;
+        GRB_TRY (GrB_mxm(
+            interf, NULL, GrB_MAX_UINT8, LAGraph_plus_one_uint8, M_2, M_2, GrB_DESC_T1
+        )) ;
+        GRB_TRY (GrB_Matrix_select_UINT8(
+            interf, NULL, NULL, GrB_OFFDIAG, interf, 0, NULL)) ;
+        GRB_TRY (GrB_mxm(
+            interf, NULL, GrB_MAX_UINT8, LAGraph_plus_one_uint8, M_1, M_2, GrB_DESC_T1
+        )) ;
+        GRB_TRY (GrB_mxm(
+            interf, NULL, GrB_MAX_UINT8, LAGraph_plus_one_uint8, M_2, M_1, GrB_DESC_T1
+        )) ;
+        GRB_TRY (GrB_Matrix_reduce_Monoid(
+            r_interf, NULL, NULL, GrB_MAX_MONOID_UINT8, 
+            interf, NULL));
+        r_exists = r_interf;
         //GRB_TRY (GrB_Matrix_select_UINT8(
         //    exists, NULL, NULL, GrB_VALUEEQ_UINT8, exists, (uint8_t) 2, NULL)) ;
         // 2 if intended swap already exists in the matrix, 1 or noval otherwise
         GRB_TRY (GrB_Matrix_reduce_Monoid(
-            r_exists, NULL, NULL, GrB_MAX_MONOID_UINT8, exists_1, NULL));
+            r_exists, NULL, GrB_MAX_UINT8, GrB_MAX_MONOID_UINT8, 
+            exists_1, NULL));
         GRB_TRY (GrB_Matrix_reduce_Monoid(
             r_exists, NULL, GrB_MAX_UINT8, GrB_MAX_MONOID_UINT8, 
             exists_2, NULL));
         GRB_TRY (GrB_Vector_select_UINT8(
             r_exists, NULL, NULL, GrB_VALUEEQ_UINT8, r_exists, (uint8_t) 2, NULL
             )) ;
-
+        GrB_Index badcount;
         GRB_TRY (GrB_Vector_nvals(&badcount, r_exists)) ;
         if(badcount == 0)
         {
