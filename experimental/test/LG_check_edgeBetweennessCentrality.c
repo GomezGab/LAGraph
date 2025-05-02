@@ -371,7 +371,8 @@ GrB_Info GxB_Matrix_pack_FullR  // pack a full matrix, held by row
     LG_TRY (GrB_assign(C_temp, A, NULL, C_temp, GrB_ALL, n, GrB_ALL, n, GrB_DESC_RS)) ;
 
     *C = C_temp;
-
+    C_temp = NULL;
+    
     if (created_sources) {
         GRB_TRY (GrB_free(&internal_sources));
     }
