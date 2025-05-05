@@ -25,7 +25,6 @@
 
 #define useAssign
 // #define debug
-#define FIXSEG
 
 #define LG_FREE_WORK                                \
 {                                                   \
@@ -174,7 +173,9 @@ int LAGr_EdgeBetweennessCentrality
     GrB_Matrix HalfUpdateT = NULL;
     GrB_Matrix SymmetricUpdate = NULL;
 
+    #if USING_GRAPHBLAS_V10
     GxB_Container conUpdt = NULL, conCent = NULL;
+    #endif 
 
     // Source nodes vector (will be created if NULL is passed)
     GrB_Vector internal_sources = NULL;
@@ -289,9 +290,10 @@ int LAGr_EdgeBetweennessCentrality
     GRB_TRY (GrB_Matrix_new(&HalfUpdate, GrB_FP64, n, n)) ;
     GRB_TRY (GrB_Matrix_new(&HalfUpdateT, GrB_FP64, n, n)) ;
     GRB_TRY (GrB_Matrix_new(&SymmetricUpdate, GrB_FP64, n, n)) ;
+    #if USING_GRAPHBLAS_V10
     GRB_TRY (GxB_Container_new(&conUpdt)) ;
     GRB_TRY (GxB_Container_new(&conCent)) ;
-
+    #endif
 
     // Iterate through source nodes
     for (GrB_Index i = 0; i < nsources; i++)
@@ -406,30 +408,11 @@ int LAGr_EdgeBetweennessCentrality
             // I = diag(i)
             // Compute weighted contributions from previous level
             //----------------------------------------------------------------------
-            #ifdef FIXSEG
-            GRB_TRY (GrB_Vector_assign (
-                I_vec, f_d1, NULL, paths, GrB_ALL, n, GrB_DESC_RS)) ;
-            GRB_TRY (GrB_Vector_assign_FP64 (
-                I_vec, NULL, GrB_PLUS_FP64, 0.0, GrB_ALL, n, NULL));
-            #else
             GRB_TRY (GrB_Vector_assign_FP64 (
                 I_vec, NULL, NULL, 0.0, GrB_ALL, n, NULL));
-            GxB_fprint(I_vec, GxB_SUMMARY, stdout) ;
-            GxB_fprint(paths, GxB_SUMMARY, stdout) ;
-            GxB_fprint(f_d1, GxB_SUMMARY, stdout) ;
-            // segfaults when f_d1 is empty
-            // calls some jit kernels which give GB_binary_search a null ptr 
-            // Probably should just quick return if mask is empty
-
             GRB_TRY (GrB_Vector_assign (
                 I_vec, f_d1, GrB_PLUS_FP64, paths, GrB_ALL, n, GrB_DESC_S)) ;
 
-            // The bug also messes with extract because it calls the same kernel
-            // Extract should also probably short circuit.
-            // GRB_TRY (GrB_Vector_extract (
-            //     I_vec, f_d1, GrB_PLUS_FP64, paths, GrB_ALL, n, GrB_DESC_S)) ;
-
-            #endif
             GRB_TRY (GrB_Matrix_diag(&I_matrix, I_vec, 0)) ;
 
             //----------------------------------------------------------------------
@@ -477,12 +460,18 @@ int LAGr_EdgeBetweennessCentrality
 
                 }
                 else {
-                    // GRB_TRY (GrB_assign(*centrality, A, GrB_PLUS_FP64, Update, GrB_ALL, n, GrB_ALL, n, 
-                    //     GrB_DESC_S));
+
+                    // The goal is to accomplish the following assign by noting 
+                    // that the matricies have the exact same structure and
+                    // that means we can just copy over the value vectors.
+                    #if !USING_GRAPHBLAS_V10
+                    GRB_TRY (GrB_assign(*centrality, A, GrB_PLUS_FP64, 
+                         Update, GrB_ALL, n, GrB_ALL, n, GrB_DESC_S)) ;
+                    #else
                     GRB_TRY(GxB_unload_Matrix_into_Container(
-                        *centrality, conCent, NULL));
+                        *centrality, conCent, NULL)) ;
                     GRB_TRY(GxB_unload_Matrix_into_Container(
-                        Update, conUpdt, NULL));
+                        Update, conUpdt, NULL)) ;
                     bool flagFormat = conCent->format == conUpdt->format && 
                         conCent->orientation == conUpdt->orientation;
                     //TODO: handle by reverting to generic GRB_Assign
@@ -490,7 +479,9 @@ int LAGr_EdgeBetweennessCentrality
                         flagFormat, GrB_INVALID_VALUE,
                         "Somehow the update matrix and centrality matrix have"
                         "different formats"
-                    );
+                    ) ;
+
+                    //Handle iso valued matricies:
                     if(conUpdt->iso) // can this happen? 
                     {//update is either empty or has an iso value somehow.
                         double val = 0;
@@ -498,14 +489,14 @@ int LAGr_EdgeBetweennessCentrality
                         GRB_TRY(GrB_Vector_apply_BinaryOp1st_FP64(
                             conCent->x, NULL, NULL, GrB_PLUS_FP64, val, 
                             conCent->x, NULL
-                        ));
+                        )) ;
                     }
                     else if(conCent->iso) 
                     {
                         double val = 0;
                         GrB_Vector_extractElement_FP64(&val, conCent->x, 0) ;
                         GRB_TRY (GrB_free(&(conCent->x))) ;
-                        GRB_TRY (GrB_Vector_dup(&(conCent->x), conUpdt->x));
+                        GRB_TRY (GrB_Vector_dup(&(conCent->x), conUpdt->x)) ;
                         GRB_TRY(GrB_Vector_apply_BinaryOp1st_FP64(
                             conCent->x, NULL, NULL, GrB_PLUS_FP64, val, 
                             conCent->x, NULL
@@ -515,13 +506,14 @@ int LAGr_EdgeBetweennessCentrality
                     else
                     {
                         GRB_TRY(GrB_assign(conCent->x, NULL, GrB_PLUS_FP64,
-                            conUpdt->x, GrB_ALL, 0, NULL));
+                            conUpdt->x, GrB_ALL, 0, NULL)) ;
                     }
                     
                     GRB_TRY(GxB_load_Matrix_from_Container(
-                        *centrality, conCent, NULL));
+                        *centrality, conCent, NULL)) ;
                     GRB_TRY(GxB_load_Matrix_from_Container(
-                        Update, conUpdt, NULL));
+                        Update, conUpdt, NULL)) ;
+                    #endif
                 }
 
                 t3 = LAGraph_WallClockTime() - t3;
@@ -541,8 +533,8 @@ int LAGr_EdgeBetweennessCentrality
             // Reduce update matrix to vector for next iteration
             //----------------------------------------------------------------------
 
-            GRB_TRY (GrB_reduce(temp_update, NULL, NULL, GrB_PLUS_MONOID_FP64, Update, NULL)) ;
-            GRB_TRY (GrB_eWiseAdd(bc_vertex_flow, NULL, NULL, GrB_PLUS_FP64, bc_vertex_flow, temp_update, NULL)) ;
+            GRB_TRY (GrB_reduce(bc_vertex_flow, NULL, GrB_PLUS_FP64, 
+                GrB_PLUS_MONOID_FP64, Update, NULL)) ;
             // 24 d = d − 1
             depth-- ;
         }
