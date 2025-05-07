@@ -26,6 +26,15 @@
 #define useAssign
 // #define debug
 
+#if USING_GRAPHBLAS_V10
+#define FREE_CONT                                   \
+{                                                   \
+    GxB_Container_free (&conUpdt) ;                 \
+    GxB_Container_free (&conCent) ;                 \
+}
+#else
+#define FREE_CONT ;
+#endif
 #define LG_FREE_WORK                                \
 {                                                   \
     GrB_free (&frontier) ;                          \
@@ -38,8 +47,7 @@
     GrB_free (&temp_update) ;                       \
     GrB_free (&Add_One_Divide) ;                    \
     GrB_free (&Update) ;                            \
-    GrB_free (&conUpdt) ;                           \
-    GrB_free (&conCent) ;                           \
+    FREE_CONT ;                                     \
     GrB_free (&HalfUpdate) ;                        \
     GrB_free (&HalfUpdateT) ;                       \
     GrB_free (&SymmetricUpdate) ;                   \
